@@ -25,3 +25,4 @@ gcc -o my-look my-look.c -Wall -Werror
 
 - Memory Leak Checking using [valgring](http://www.valgrind.org/)
 - Code style checking tools, such as Google's [cpplint](https://github.com/cpplint/cpplint)
+- Potential problem, If size of some line read by `my-diff` is larger than RAM, the program can failed because of `getline`.
