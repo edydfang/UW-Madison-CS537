@@ -1,3 +1,5 @@
+// Copyright [2019] <Yidong Fang>
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
