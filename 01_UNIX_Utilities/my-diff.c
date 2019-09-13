@@ -13,7 +13,7 @@ void remove_newline(char *line) {
 int main(int argc, char **argv) {
   // check arguments count
   if (argc != 3) {
-    fprintf(stderr, "mydiff: invalid number of arguments\n");
+    printf("my-diff: invalid number of arguments\n");
     return 1;
   }
   // assign the argument to the vars
@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   FILE *fpA = fopen(fileAname, "r");
   FILE *fpB = fopen(fileBname, "r");
   if (fpA == NULL || fpB == NULL) {
-    fprintf(stderr, "mydiff: cannot open file\n");
+    printf("my-diff: cannot open file\n");
     return 1;
   }
 

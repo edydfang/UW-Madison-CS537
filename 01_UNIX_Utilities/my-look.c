@@ -21,7 +21,7 @@ char *str_to_lower(char *input_str) {
 int main(int argc, char **argv) {
   // check arguments count
   if (argc < 2 || argc > 3) {
-    fprintf(stderr, "my-look: invalid number of arguments\n");
+    printf("my-look: invalid number of arguments\n");
     return 1;
   }
   // assign the argument to the vars
@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
   // open the dictionary file
   FILE *fp = fopen(filename, "r");
   if (fp == NULL) {
-    fprintf(stderr, "cannot open file\n");
+    printf("my-look: cannot open file\n");
     return 1;
   }
 

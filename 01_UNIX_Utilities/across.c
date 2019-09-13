@@ -37,8 +37,8 @@ int check_letters(char *input_str) {
 
 int main(int argc, char **argv) {
   // check arguments count
-  if (argc < 3 || argc > 4) {
-    fprintf(stderr, "across: invalid number of arguments\n");
+  if (argc < 4 || argc > 5) {
+    printf("across: invalid number of arguments\n");
     return 1;
   }
   // assign the argument to the vars
@@ -46,8 +46,7 @@ int main(int argc, char **argv) {
   int start_idx, target_len;
   str = argv[1];
   if (check_digits(argv[2]) || check_digits(argv[3])) {
-    fprintf(stderr,
-            "across: invalid arguments for start index or word length\n");
+    printf("across: invalid arguments for start index or word length\n");
     return 1;
   }
   start_idx = strtol(argv[2], NULL, 10);
@@ -62,19 +61,18 @@ int main(int argc, char **argv) {
   // open the dictionary file
   FILE *fp = fopen(filename, "r");
   if (fp == NULL) {
-    fprintf(stderr, "across: cannot open file\n");
+    printf("across: cannot open file\n");
     return 1;
   }
 
   if (strlen(str) + start_idx > target_len) {
-    fprintf(stderr, "across: invalid position\n");
+    printf("across: invalid position\n");
     fclose(fp);
     return 1;
   }
 
   // size 100 is engouth for assmumed condition
   char line[100];
-  char *line_lower;
   int result, str_len = strlen(str);
   int line_len_without_n, line_len;
   // read file
