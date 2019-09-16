@@ -89,3 +89,36 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int
+sys_getofilecnt(void)
+{
+  int pid;
+  int cnt = 0;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  // do something to get the count of opened file desciptors
+  for (int i = 0; i < NOFILE; i++) {
+    if (myproc()->ofile[i] != 0) {
+      cnt += 1;
+    }
+  }
+  return cnt;
+}
+
+int
+sys_getofilenext(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  // do something to get the next file desciptor
+  for (int i = 0; i < NOFILE; i++) {
+    if (myproc()->ofile[i] == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
