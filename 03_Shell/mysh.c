@@ -1,4 +1,5 @@
 // Copyright [2019] <Yidong Fang>
+#include <ctype.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -160,6 +161,16 @@ int func_general_cmd(char** argv, int argc, int bg_flag, int rd_flag) {
   }
 }
 
+int isnumber(const char* number_str) {
+  int str_len = strlen(number_str);
+  for (size_t i = 0; i < str_len; i++) {
+    if (!isdigit(number_str[i])) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 int check_built_in(char** arg_arr, int num_arg) {
   /*
   0 - no built-in keyword
@@ -176,8 +187,15 @@ int check_built_in(char** arg_arr, int num_arg) {
     }
   } else if (num_arg == 2 && strcmp(WAIT_CMD, arg_arr[0]) == 0) {
     // wait command
-    // TODO(edydfang): check whether the 2nd argument is a number first
-    func_wait(atoi(arg_arr[1]));
+    if (!isnumber(arg_arr[1])) {
+      fprintf(
+          stderr,
+          "Error: built-in command wait only accept number as arguments!\n");
+      fflush(stderr);
+    } else {
+      func_wait(atoi(arg_arr[1]));
+    }
+
     return 1;
   }
   return 0;
@@ -234,7 +252,6 @@ int parse_command(char* command) {
 }
 
 int main(int argc, char** argv) {
-  FILE* batch_fd = NULL;
   int eof_indicator = 0;
   if (argc > 2) {
     write(STDERR_FILENO, INVALID_ARG, sizeof(INVALID_ARG));
@@ -255,6 +272,10 @@ int main(int argc, char** argv) {
     }
 
   } else {
+    FILE* batch_fd = NULL;
+    char* line = NULL;
+    size_t len = 0;
+    ssize_t read;
     // batch mode
     batch_fd = fopen(argv[1], "r");
     if (batch_fd == NULL) {
@@ -268,10 +289,23 @@ int main(int argc, char** argv) {
       fflush(stderr);
       return 1;
     }
-  }
-
-  if (batch_fd) {
-    fclose(batch_fd);
+    while ((read = getline(&line, &len, batch_fd)) != -1) {
+      if (read > 512) {
+        fprintf(stderr, "Error: Line longer than 512!\n");
+        fflush(stderr);
+        exit(EXIT_FAILURE);
+      }
+      printf("%s", line);
+      // do we need the following part or not?
+      if (line[strlen(line) - 1] == '\n') {
+        printf("\n");
+      }
+      fflush(stdout);
+      parse_command(line);
+    }
+    if (batch_fd) {
+      fclose(batch_fd);
+    }
   }
 
   return 0;
