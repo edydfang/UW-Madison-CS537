@@ -325,11 +325,9 @@ int main(int argc, char** argv) {
     if (batch_fd) {
       fclose(batch_fd);
     }
-    if (line)
-    {
+    if (line) {
       free(line);
     }
-    
   }
   exit_cleanup();
 
