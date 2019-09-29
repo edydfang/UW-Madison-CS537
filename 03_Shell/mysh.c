@@ -97,6 +97,25 @@ void func_exit() {
   exit(0);
 }
 
+void exit_cleanup() {
+  // TODO(edydfang): do we need to kill bg child processes?
+  pid_t wait_return;
+  for (size_t i = 0; i < MAX_SIM_JOBS; i++) {
+    if (job_arr[i] != NULL) {
+      // wait_return = waitpid(job_arr[i]->jobpid, NULL, WNOHANG);
+      // 0 - running, -1 - error, pid - stopped (appear only once)
+      // printf("%d return %d\n", job_arr[i]->jobid, wait_return);
+      // if (wait_return == job_arr[i]->jobpid || wait_return == -1) {
+      for (size_t k = 0; k < job_arr[i]->argc; k++) {
+        free(job_arr[i]->argv[k]);
+      }
+      free(job_arr[i]->argv);
+      free(job_arr[i]);
+      job_arr[i] = NULL;
+      //}
+    }
+  }
+}
 void job_arr_add(char* const* argv, int argc, pid_t job_pid) {
   // melloc space for new argv
   char** argv_new = (char**)malloc(sizeof(char**) * argc);
@@ -297,7 +316,7 @@ int main(int argc, char** argv) {
       }
       printf("%s", line);
       // do we need the following part or not?
-      if (line[strlen(line) - 1] == '\n') {
+      if (line[strlen(line) - 1] != '\n') {
         printf("\n");
       }
       fflush(stdout);
@@ -306,7 +325,13 @@ int main(int argc, char** argv) {
     if (batch_fd) {
       fclose(batch_fd);
     }
+    if (line)
+    {
+      free(line);
+    }
+    
   }
+  exit_cleanup();
 
   return 0;
 }
