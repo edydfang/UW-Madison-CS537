@@ -6,8 +6,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define MAX_COMMAND_LEN 512
-#define MAX_PARSE_NUM 256
+#define MAX_COMMAND_LEN 520
+#define MAX_PARSE_NUM 260
+#define MAX_SIM_JOBS 40
 #define WAIT_CMD "wait"
 #define JOBS_CMD "jobs"
 #define EXIT_CMD "exit"
@@ -15,13 +16,64 @@
 
 static const char INVALID_ARG[] = "Usage: mysh [batchFile]\n";
 
+static int jobid_next = 0;
+
+typedef struct job_info_s {
+  int jobid;
+  int running;
+  pid_t jobpid;
+  char** argv;
+  int argc;
+} job_info;
+
+static job_info* job_arr[MAX_SIM_JOBS];
+
 void func_wait(int pid) {
   printf("wait invoked.\n");
   return;
 }
 
 void func_jobs() {
+  char job_cmd[MAX_COMMAND_LEN];
+  char* p_job_cmd;
   // print all background jobs
+  // check all the process status
+  pid_t wait_return;
+  for (size_t i = 0; i < MAX_SIM_JOBS; i++) {
+    if (job_arr[i] != NULL) {
+      wait_return = waitpid(job_arr[i]->jobpid, NULL, WNOHANG);
+      // 0 - running, -1 - error, pid - stopped (appear only once)
+      // printf("%d return %d\n", job_arr[i]->jobid, wait_return);
+      if (wait_return == job_arr[i]->jobpid || wait_return == -1) {
+        for (size_t k = 0; k < job_arr[i]->argc; k++) {
+          free(job_arr[i]->argv[k]);
+        }
+        free(job_arr[i]->argv);
+        free(job_arr[i]);
+        job_arr[i] = NULL;
+      } else {
+        // the job is still running
+        // reset pointer
+        p_job_cmd = job_cmd;
+        for (size_t j = 0; j < job_arr[i]->argc; j++) {
+          int spf_result =
+              snprintf(p_job_cmd, sizeof(job_cmd) - (p_job_cmd - job_cmd),
+                       "%s ", job_arr[i]->argv[j]);
+          if (spf_result >= 0) {
+            p_job_cmd += spf_result;
+          } else {
+            fprintf(stderr, "error in jobs command.\n");
+            fflush(stderr);
+            exit(1);
+          }
+        }
+        // remove the last space
+        job_cmd[strlen(job_cmd) - 1] = '\0';
+        printf("%d : %s\n", job_arr[i]->jobid, job_cmd);
+      }
+    }
+  }
+  fflush(stdout);
 }
 
 void func_exit() {
@@ -29,7 +81,30 @@ void func_exit() {
   exit(0);
 }
 
-int func_general_cmd(const char* program_path, char** argv, int background) {
+void job_arr_add(char* const* argv, int argc, pid_t job_pid) {
+  // melloc space for new argv
+  char** argv_new = (char**)malloc(sizeof(char**) * argc);
+  char* arg_new;
+  for (size_t i = 0; i < argc; i++) {
+    arg_new = (char*)malloc(strlen(argv[i]) + 1);
+    argv_new[i] = strncpy(arg_new, argv[i], strlen(argv[i]) + 1);
+  }
+
+  for (size_t i = 0; i < MAX_SIM_JOBS; i++) {
+    if (job_arr[i] == NULL) {
+      job_arr[i] = malloc(sizeof(job_info));
+      job_arr[i]->jobid = jobid_next;
+      job_arr[i]->argv = argv_new;
+      job_arr[i]->argc = argc;
+      job_arr[i]->running = 1;
+      job_arr[i]->jobpid = job_pid;
+      return;
+    }
+  }
+  return;
+}
+
+int func_general_cmd(char* const* argv, int argc, int background) {
   /*
   background 1: run int the backgrond
   background 0: wait the child
@@ -40,8 +115,8 @@ int func_general_cmd(const char* program_path, char** argv, int background) {
   child_pid = fork();
   if (child_pid == 0) {
     // child process
-    execvp(program_path, argv);
-    fprintf(stderr, "%s: Command not found\n", program_path);
+    execvp(argv[0], argv);
+    fprintf(stderr, "%s: Command not found\n", argv[0]);
     fflush(stderr);
   } else {
     // parent process
@@ -52,6 +127,8 @@ int func_general_cmd(const char* program_path, char** argv, int background) {
       } while (tpid != child_pid);
     }
     // add child process into the data structure
+    job_arr_add(argv, argc, child_pid);
+    jobid_next++;
     return 0;
   }
 }
@@ -88,20 +165,26 @@ int parse_command(char* command) {
   int num_parse = 0, bg_flag = 0;
   // store all arguments into the arg_arr
   while (token) {
+    // this will include a new line char
     arg_arr[num_parse++] = token;
-    // printf("%s\n", token);
-    // fflush(stdout);
     token = strtok_r(NULL, " ", &command);
+  }
+
+  // remove newline char from the last token
+  int len = strlen(arg_arr[num_parse - 1]);
+  if (len > 1 && arg_arr[num_parse - 1][len - 1] == '\n') {
+    arg_arr[num_parse - 1][len - 1] = '\0';
+  } else if (arg_arr[num_parse - 1][0] == '\n') {
+    // the last token is a newline
+    num_parse--;
   }
   if (num_parse == 0) {
     // do nothing
     return 1;
   }
-  // remove newline char from the last token
-  int len = strlen(arg_arr[num_parse - 1]);
-  arg_arr[num_parse - 1][len - 1] = '\0';
+
   // check bg flag
-  if (strcmp("&", arg_arr[0]) == 0) {
+  if (strcmp("&", arg_arr[num_parse - 1]) == 0) {
     bg_flag = 1;
   }
   // char* argv_new[num_parse - bg_flag];
@@ -112,7 +195,7 @@ int parse_command(char* command) {
 
   // check keyword function
   if (!check_built_in(arg_arr, num_parse - bg_flag)) {
-    func_general_cmd(arg_arr[0], arg_arr, bg_flag);
+    func_general_cmd(arg_arr, num_parse - bg_flag, bg_flag);
   }
 
   return 0;
