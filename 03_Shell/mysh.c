@@ -1,7 +1,9 @@
 // Copyright [2019] <Yidong Fang>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -117,23 +119,35 @@ void job_arr_add(char* const* argv, int argc, pid_t job_pid) {
   return;
 }
 
-int func_general_cmd(char* const* argv, int argc, int background) {
+int func_general_cmd(char** argv, int argc, int bg_flag, int rd_flag) {
   /*
   background 1: run int the backgrond
   background 0: wait the child
   */
   pid_t child_pid, tpid;
   int child_status;
-
+  char* rd_filename;
+  if (rd_flag) {
+    rd_filename = argv[argc + 1];
+  }
+  argv[argc] = NULL;
   child_pid = fork();
   if (child_pid == 0) {
     // child process
+    fflush(stdout);
+    if (rd_flag) {
+      // output redirection
+      int rd_fd = open(rd_filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+      dup2(rd_fd, 1);
+      dup2(rd_fd, 2);
+      close(rd_fd);
+    }
     execvp(argv[0], argv);
     fprintf(stderr, "%s: Command not found\n", argv[0]);
     fflush(stderr);
   } else {
     // parent process
-    if (!background) {
+    if (!bg_flag) {
       // wait the child process to end
       do {
         tpid = wait(&child_status);
@@ -177,7 +191,8 @@ int parse_command(char* command) {
   */
   char* arg_arr[MAX_PARSE_NUM];
   char* token = strtok_r(command, " ", &command);
-  int num_parse = 0, bg_flag = 0;
+  char* redirect_filename = NULL;
+  int num_parse = 0, bg_flag = 0, rd_flag = 0;
   // store all arguments into the arg_arr
   while (token) {
     // this will include a new line char
@@ -193,8 +208,8 @@ int parse_command(char* command) {
     // the last token is a newline
     num_parse--;
   }
+  // empty argument line
   if (num_parse == 0) {
-    // do nothing
     return 1;
   }
 
@@ -202,15 +217,17 @@ int parse_command(char* command) {
   if (strcmp("&", arg_arr[num_parse - 1]) == 0) {
     bg_flag = 1;
   }
-  // char* argv_new[num_parse - bg_flag];
-  // for (size_t i = 0; i < num_parse - bg_flag; i++) {
-  //   argv_new[i] = arg_arr[i];
-  // }
-  arg_arr[num_parse - bg_flag] = NULL;
+
+  // check redirection
+  if (num_parse - bg_flag >= 3 &&
+      strcmp(arg_arr[num_parse - bg_flag - 2], ">") == 0) {
+    rd_flag = 1;
+  }
+  int argc = num_parse - bg_flag - 2 * rd_flag;
 
   // check keyword function
-  if (!check_built_in(arg_arr, num_parse - bg_flag)) {
-    func_general_cmd(arg_arr, num_parse - bg_flag, bg_flag);
+  if (!check_built_in(arg_arr, argc)) {
+    func_general_cmd(arg_arr, argc, bg_flag, rd_flag);
   }
 
   return 0;
