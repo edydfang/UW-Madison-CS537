@@ -28,8 +28,21 @@ typedef struct job_info_s {
 
 static job_info* job_arr[MAX_SIM_JOBS];
 
-void func_wait(int pid) {
-  printf("wait invoked.\n");
+void func_wait(int jobid) {
+  pid_t wait_result;
+  if (jobid >= jobid_next) {
+    fprintf(stdout, "Invalid JID %d\n", jobid);
+  } else {
+    // check whether the job is still running
+    for (size_t i = 0; i < MAX_SIM_JOBS; i++) {
+      if (job_arr[i] != NULL && job_arr[i]->jobid == jobid) {
+        waitpid(job_arr[i]->jobpid, NULL, 0);
+        break;
+      }
+    }
+    fprintf(stdout, "JID %d terminated \n", jobid);
+  }
+  fflush(stdout);
   return;
 }
 
@@ -138,6 +151,7 @@ int check_built_in(char** arg_arr, int num_arg) {
   0 - no built-in keyword
   1 - built-in keywrod activated
   */
+  // printf("\nChecking: %s\n", arg_arr[0]);
   if (num_arg == 1) {
     if (strcmp(EXIT_CMD, arg_arr[0]) == 0) {
       func_exit();
@@ -148,7 +162,8 @@ int check_built_in(char** arg_arr, int num_arg) {
     }
   } else if (num_arg == 2 && strcmp(WAIT_CMD, arg_arr[0]) == 0) {
     // wait command
-    // check whether the 2nd argument is a number first
+    // TODO(edydfang): check whether the 2nd argument is a number first
+    func_wait(atoi(arg_arr[1]));
     return 1;
   }
   return 0;
