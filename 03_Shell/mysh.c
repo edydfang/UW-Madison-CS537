@@ -165,6 +165,7 @@ int func_general_cmd(char** argv, int argc, int bg_flag, int rd_flag) {
     execvp(argv[0], argv);
     fprintf(stderr, "%s: Command not found\n", argv[0]);
     fflush(stderr);
+    exit(EXIT_FAILURE);
   } else {
     // parent process
     if (!bg_flag) {
@@ -273,7 +274,9 @@ int parse_command(char* command) {
 int main(int argc, char** argv) {
   int eof_indicator = 0;
   if (argc > 2) {
-    write(STDERR_FILENO, INVALID_ARG, sizeof(INVALID_ARG));
+    // fprintf(stderr, INVALID_ARG);
+    // fflush(stdout);
+    write(STDERR_FILENO, INVALID_ARG, strlen(INVALID_ARG));
     return 1;
   } else if (argc == 1) {
     // interactive mode
