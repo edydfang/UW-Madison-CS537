@@ -43,7 +43,7 @@ void func_wait(int jobid) {
         break;
       }
     }
-    fprintf(stdout, "JID %d terminated \n", jobid);
+    fprintf(stdout, "JID %d terminated\n", jobid);
   }
   fflush(stdout);
   return;
@@ -321,7 +321,7 @@ int main(int argc, char** argv) {
     // interactive mode
     while (1) {
       char command[MAX_COMMAND_LEN];
-      write(STDOUT_FILENO, PROPMT, sizeof(PROPMT));
+      write(STDOUT_FILENO, PROPMT, strlen(PROPMT));
       fgets(command, MAX_COMMAND_LEN, stdin);
       eof_indicator = feof(stdin);
       if (eof_indicator) {
