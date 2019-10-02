@@ -369,12 +369,12 @@ int main(int argc, char** argv) {
       return 1;
     }
     while ((read = getline(&line, &len, batch_fd)) != -1) {
+      printf("%s", line);
       if (read > 512) {
         fprintf(stderr, "Error: Line longer than 512!\n");
         fflush(stderr);
         continue;
       }
-      printf("%s", line);
       // do we need the following part or not?
       if (line[strlen(line) - 1] != '\n') {
         printf("\n");
