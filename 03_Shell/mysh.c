@@ -313,6 +313,7 @@ int parse_command(char* command) {
 
 int main(int argc, char** argv) {
   int eof_indicator = 0;
+  int long_line_flag = 0;
   if (argc > 2) {
     // fprintf(stderr, INVALID_ARG);
     // fflush(stdout);
@@ -322,13 +323,29 @@ int main(int argc, char** argv) {
     // interactive mode
     while (1) {
       char command[MAX_COMMAND_LEN];
-      write(STDOUT_FILENO, PROPMT, strlen(PROPMT));
+      if (!long_line_flag) {
+        write(STDOUT_FILENO, PROPMT, strlen(PROPMT));
+      }
       fgets(command, MAX_COMMAND_LEN, stdin);
       eof_indicator = feof(stdin);
       if (eof_indicator) {
         printf("\n");
         fflush(stdout);
         break;
+      } else {
+        // check 512 char by checking newline char
+        if (command[strlen(command) - 1] != '\n') {
+          if (!long_line_flag) {
+            fprintf(stderr, "Error: Line longer than 512!\n");
+            fflush(stderr);
+            long_line_flag = 1;
+            continue;
+          } else {
+            continue;
+          }
+        } else if (long_line_flag) {
+          long_line_flag = 0;
+        }
       }
       parse_command(command);
     }
@@ -355,7 +372,7 @@ int main(int argc, char** argv) {
       if (read > 512) {
         fprintf(stderr, "Error: Line longer than 512!\n");
         fflush(stderr);
-        exit(EXIT_FAILURE);
+        continue;
       }
       printf("%s", line);
       // do we need the following part or not?
