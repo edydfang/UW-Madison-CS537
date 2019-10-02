@@ -34,7 +34,8 @@ static job_info* job_arr[MAX_SIM_JOBS];
 void func_wait(int jobid) {
   pid_t wait_result;
   if (jobid >= jobid_next) {
-    fprintf(stdout, "Invalid JID %d\n", jobid);
+    fprintf(stderr, "Invalid JID %d\n", jobid);
+    fflush(stderr);
   } else {
     // check whether the job is still running
     for (size_t i = 0; i < MAX_SIM_JOBS; i++) {
@@ -44,8 +45,8 @@ void func_wait(int jobid) {
       }
     }
     fprintf(stdout, "JID %d terminated\n", jobid);
+    fflush(stdout);
   }
-  fflush(stdout);
   return;
 }
 
