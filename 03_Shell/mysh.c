@@ -153,15 +153,15 @@ int func_general_cmd(char** argv, int argc, int bg_flag, int rd_flag) {
   child_pid = fork();
   if (child_pid == 0) {
     // child process
-    fflush(stdout);
     if (rd_flag) {
       // output redirection
       int rd_fd = open(rd_filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
       dup2(rd_fd, 1);
       dup2(rd_fd, 2);
       close(rd_fd);
-      argv[argc] = NULL;
     }
+    argv[argc] = NULL;
+    printf(argv[0]);
     execvp(argv[0], argv);
     fprintf(stderr, "%s: Command not found\n", argv[0]);
     fflush(stderr);
