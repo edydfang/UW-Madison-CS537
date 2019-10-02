@@ -148,9 +148,8 @@ int func_general_cmd(char** argv, int argc, int bg_flag, int rd_flag) {
   int child_status;
   char* rd_filename;
   if (rd_flag) {
-    rd_filename = argv[argc + 1];
+    rd_filename = argv[argc];
   }
-  argv[argc] = NULL;
   child_pid = fork();
   if (child_pid == 0) {
     // child process
@@ -161,6 +160,7 @@ int func_general_cmd(char** argv, int argc, int bg_flag, int rd_flag) {
       dup2(rd_fd, 1);
       dup2(rd_fd, 2);
       close(rd_fd);
+      argv[argc] = NULL;
     }
     execvp(argv[0], argv);
     fprintf(stderr, "%s: Command not found\n", argv[0]);
@@ -191,13 +191,13 @@ int isnumber(const char* number_str) {
   return 1;
 }
 
-int check_built_in(char** arg_arr, int num_arg) {
+int check_built_in(char** arg_arr, int argc) {
   /*
   0 - no built-in keyword
   1 - built-in keywrod activated
   */
   // printf("\nChecking: %s\n", arg_arr[0]);
-  if (num_arg == 1) {
+  if (argc == 1) {
     if (strcmp(EXIT_CMD, arg_arr[0]) == 0) {
       func_exit();
       return 1;
@@ -205,7 +205,7 @@ int check_built_in(char** arg_arr, int num_arg) {
       func_jobs();
       return 1;
     }
-  } else if (num_arg == 2 && strcmp(WAIT_CMD, arg_arr[0]) == 0) {
+  } else if (argc == 2 && strcmp(WAIT_CMD, arg_arr[0]) == 0) {
     // wait command
     if (!isnumber(arg_arr[1])) {
       fprintf(
@@ -231,10 +231,50 @@ int parse_command(char* command) {
   char* token = strtok_r(command, " ", &command);
   char* redirect_filename = NULL;
   int num_parse = 0, bg_flag = 0, rd_flag = 0;
+
+  int num_arg_after_rd = 0;
+  char* rd_p;
   // store all arguments into the arg_arr
   while (token) {
-    // this will include a new line char
-    arg_arr[num_parse++] = token;
+    // strtok will include a new line char
+    rd_p = strchr(token, '>');
+    if (rd_p) {
+      if (rd_flag || (*(rd_p + 1) != 0 && strchr(rd_p + 1, '>'))) {
+        // multiple >, error
+        fprintf(stderr, "Error: Multiple redirection characters!\n");
+        fflush(stderr);
+        return 1;
+      }
+      rd_flag = 1;
+      if (rd_p - token > 0) {
+        // some char on the left
+        *rd_p = '\0';
+
+        // all arg after > should have larger idex than this
+        // rd_char_pos = num_parse;
+        // add left side arg
+        arg_arr[num_parse++] = token;
+      }
+      if (*(rd_p + 1) != 0) {
+        // add right side arg
+        arg_arr[num_parse++] = rd_p + 1;
+        num_arg_after_rd += 1;
+      }
+
+    } else {
+      if (rd_flag) {
+        num_arg_after_rd += 1;
+        if (num_arg_after_rd > 1) {
+          fprintf(stderr,
+                  "Error: Multiple arguments after redirection character!\n");
+          fflush(stderr);
+          return 1;
+        }
+      }
+
+      arg_arr[num_parse++] = token;
+    }
+
     token = strtok_r(NULL, " ", &command);
   }
 
@@ -256,12 +296,12 @@ int parse_command(char* command) {
     bg_flag = 1;
   }
 
-  // check redirection
-  if (num_parse - bg_flag >= 3 &&
-      strcmp(arg_arr[num_parse - bg_flag - 2], ">") == 0) {
-    rd_flag = 1;
-  }
-  int argc = num_parse - bg_flag - 2 * rd_flag;
+  // // check redirection
+  // if (num_parse - bg_flag >= 3 &&
+  //     strcmp(arg_arr[num_parse - bg_flag - 2], ">") == 0) {
+  //   rd_flag = 1;
+  // }
+  int argc = num_parse - bg_flag - rd_flag;
 
   // check keyword function
   if (!check_built_in(arg_arr, argc)) {
