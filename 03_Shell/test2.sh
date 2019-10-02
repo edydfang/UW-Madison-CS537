@@ -1,0 +1,2 @@
+echo "runing interactively"
+exit

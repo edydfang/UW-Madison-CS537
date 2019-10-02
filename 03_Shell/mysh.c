@@ -161,7 +161,6 @@ int func_general_cmd(char** argv, int argc, int bg_flag, int rd_flag) {
       close(rd_fd);
     }
     argv[argc] = NULL;
-    printf(argv[0]);
     execvp(argv[0], argv);
     fprintf(stderr, "%s: Command not found\n", argv[0]);
     fflush(stderr);
@@ -322,7 +321,7 @@ int main(int argc, char** argv) {
     // interactive mode
     while (1) {
       char command[MAX_COMMAND_LEN];
-      write(STDERR_FILENO, PROPMT, sizeof(PROPMT));
+      write(STDOUT_FILENO, PROPMT, sizeof(PROPMT));
       fgets(command, MAX_COMMAND_LEN, stdin);
       eof_indicator = feof(stdin);
       if (eof_indicator) {
