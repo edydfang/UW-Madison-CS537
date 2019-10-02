@@ -18,6 +18,8 @@
 #define PROPMT "mysh> "
 
 static const char INVALID_ARG[] = "Usage: mysh [batchFile]\n";
+FILE* batch_fd = NULL;
+char* line = NULL;
 
 static int jobid_next = 0;
 
@@ -93,11 +95,6 @@ void func_jobs() {
   fflush(stdout);
 }
 
-void func_exit() {
-  // exit the shell
-  exit(0);
-}
-
 void exit_cleanup() {
   // TODO(edydfang): do we need to kill bg child processes?
   pid_t wait_return;
@@ -113,9 +110,20 @@ void exit_cleanup() {
       free(job_arr[i]->argv);
       free(job_arr[i]);
       job_arr[i] = NULL;
-      //}
+
+      if (batch_fd) {
+        fclose(batch_fd);
+      }
+      if (line) {
+        free(line);
+      }
     }
   }
+}
+void func_exit() {
+  // exit the shell
+  exit_cleanup();
+  exit(0);
 }
 void job_arr_add(char* const* argv, int argc, pid_t job_pid) {
   // melloc space for new argv
@@ -351,8 +359,6 @@ int main(int argc, char** argv) {
     }
 
   } else {
-    FILE* batch_fd = NULL;
-    char* line = NULL;
     size_t len = 0;
     ssize_t read;
     // batch mode
@@ -381,12 +387,6 @@ int main(int argc, char** argv) {
       }
       fflush(stdout);
       parse_command(line);
-    }
-    if (batch_fd) {
-      fclose(batch_fd);
-    }
-    if (line) {
-      free(line);
     }
   }
   exit_cleanup();
