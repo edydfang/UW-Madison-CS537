@@ -141,16 +141,16 @@ void job_arr_add(char* const* argv, int argc, pid_t job_pid) {
   for (size_t i = 0; i < MAX_SIM_JOBS; i++) {
     if (job_arr[i] != NULL) {
       wait_return = waitpid(job_arr[i]->jobpid, NULL, WNOHANG);
-    }
-    // 0 - running, -1 - error, pid - stopped (appear only once)
-    // printf("%d return %d\n", job_arr[i]->jobid, wait_return);
-    if (wait_return == job_arr[i]->jobpid || wait_return == -1) {
-      for (size_t k = 0; k < job_arr[i]->argc; k++) {
-        free(job_arr[i]->argv[k]);
+      // 0 - running, -1 - error, pid - stopped (appear only once)
+      // printf("%d return %d\n", job_arr[i]->jobid, wait_return);
+      if (wait_return == job_arr[i]->jobpid || wait_return == -1) {
+        for (size_t k = 0; k < job_arr[i]->argc; k++) {
+          free(job_arr[i]->argv[k]);
+        }
+        free(job_arr[i]->argv);
+        free(job_arr[i]);
+        job_arr[i] = NULL;
       }
-      free(job_arr[i]->argv);
-      free(job_arr[i]);
-      job_arr[i] = NULL;
     }
   }
 
