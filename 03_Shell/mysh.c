@@ -12,6 +12,7 @@
 #define MAX_COMMAND_LEN 520
 #define MAX_PARSE_NUM 260
 #define MAX_SIM_JOBS 40
+#define MAX_JID 1000
 #define WAIT_CMD "wait"
 #define JOBS_CMD "jobs"
 #define EXIT_CMD "exit"
@@ -22,6 +23,7 @@ FILE* batch_fd = NULL;
 char* line = NULL;
 
 static int jobid_next = 0;
+static char bg_flag[MAX_JID];
 
 typedef struct job_info_s {
   int jobid;
@@ -35,7 +37,7 @@ static job_info* job_arr[MAX_SIM_JOBS];
 
 void func_wait(int jobid) {
   pid_t wait_result;
-  if (jobid >= jobid_next) {
+  if (jobid >= jobid_next || (jobid < jobid_next && bg_flag[jobid] != 1)) {
     fprintf(stderr, "Invalid JID %d\n", jobid);
     fflush(stderr);
   } else {
@@ -71,7 +73,7 @@ void func_jobs() {
         free(job_arr[i]);
         job_arr[i] = NULL;
       } else {
-        // the job is still running
+        // the job is still running, print the job name
         // reset pointer
         p_job_cmd = job_cmd;
         for (size_t j = 0; j < job_arr[i]->argc; j++) {
@@ -129,9 +131,25 @@ void job_arr_add(char* const* argv, int argc, pid_t job_pid) {
   // melloc space for new argv
   char** argv_new = (char**)malloc(sizeof(char**) * argc);
   char* arg_new;
+  bg_flag[jobid_next] = 1;
   for (size_t i = 0; i < argc; i++) {
     arg_new = (char*)malloc(strlen(argv[i]) + 1);
     argv_new[i] = strncpy(arg_new, argv[i], strlen(argv[i]) + 1);
+  }
+  pid_t wait_return;
+  // clean the stopped job in job_arr
+  for (size_t i = 0; i < MAX_SIM_JOBS; i++) {
+    wait_return = waitpid(job_arr[i]->jobpid, NULL, WNOHANG);
+    // 0 - running, -1 - error, pid - stopped (appear only once)
+    // printf("%d return %d\n", job_arr[i]->jobid, wait_return);
+    if (wait_return == job_arr[i]->jobpid || wait_return == -1) {
+      for (size_t k = 0; k < job_arr[i]->argc; k++) {
+        free(job_arr[i]->argv[k]);
+      }
+      free(job_arr[i]->argv);
+      free(job_arr[i]);
+      job_arr[i] = NULL;
+    }
   }
 
   for (size_t i = 0; i < MAX_SIM_JOBS; i++) {
@@ -145,6 +163,8 @@ void job_arr_add(char* const* argv, int argc, pid_t job_pid) {
       return;
     }
   }
+  fprintf(stderr, "More than 32 jobs running in the background!");
+  fflush(stderr);
   return;
 }
 
@@ -181,10 +201,11 @@ int func_general_cmd(char** argv, int argc, int bg_flag, int rd_flag) {
       do {
         tpid = wait(&child_status);
       } while (tpid != child_pid);
+    } else {
+      // add child process into the data structure
+      job_arr_add(argv, argc, child_pid);
+      jobid_next++;
     }
-    // add child process into the data structure
-    job_arr_add(argv, argc, child_pid);
-    jobid_next++;
     return 0;
   }
 }
