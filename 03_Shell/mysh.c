@@ -206,8 +206,8 @@ int func_general_cmd(char** argv, int argc, int bg_flag, int rd_flag) {
     } else {
       // add child process into the data structure
       job_arr_add(argv, argc, child_pid);
-      jobid_next++;
     }
+    jobid_next++;
     return 0;
   }
 }
