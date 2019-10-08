@@ -91,34 +91,41 @@ sys_uptime(void)
 }
 
 int
-sys_getofilecnt(void)
+sys_getofilecnt(int pid)
 {
-  int pid;
   int cnt = 0;
 
   if(argint(0, &pid) < 0)
     return -1;
   // do something to get the count of opened file desciptors
-  for (int i = 0; i < NOFILE; i++) {
-    if (myproc()->ofile[i] != 0) {
-      cnt += 1;
+  struct proc *p = getprocbyid(pid);
+  if(p) {
+    for (int i = 0; i < NOFILE; i++) {
+      if (p->ofile[i] != 0) {
+        cnt += 1;
+      }
     }
+    return cnt;
+  } else {
+    return -1;
   }
-  return cnt;
 }
 
 int
-sys_getofilenext(void)
+sys_getofilenext(int pid)
 {
-  int pid;
-
   if(argint(0, &pid) < 0)
     return -1;
   // do something to get the next file desciptor
-  for (int i = 0; i < NOFILE; i++) {
-    if (myproc()->ofile[i] == 0) {
-      return i;
+  struct proc *p = getprocbyid(pid);
+  if(p) {
+    for (int i = 0; i < NOFILE; i++) {
+      if (p->ofile[i] == 0) {
+        return i;
+      }
     }
+    return -1;
+  } else {
+    return -1;
   }
-  return -1;
 }

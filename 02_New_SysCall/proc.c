@@ -527,3 +527,17 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+// get the proc pointer by PID
+struct proc *getprocbyid(int pid)
+{
+  struct proc *p;
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      return p;
+    }
+  }
+  return 0;
+  
+}
