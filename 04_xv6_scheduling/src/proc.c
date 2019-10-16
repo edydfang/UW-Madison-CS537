@@ -7,9 +7,12 @@
 #include "proc.h"
 #include "spinlock.h"
 
+// all possbile nodes in the queues
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+  queue_node q_node[NPROC];
+  queue_node *q_head[4]; //0-pri3, 1-pri2, 2-pri1, 3-pri0
 } ptable;
 
 static struct proc *initproc;
@@ -88,6 +91,17 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
 
+  queue_node *new_node;
+  // get unused node and allocate it
+  for (int i = 0; i < NPROC; i++) {
+    if (ptable.q_node[i].inuse==0) {
+      new_node = &ptable.q_node[i];
+      new_node->inuse = 1;
+      p->q_node = new_node;
+      p->q_node->proc = p;
+      break;
+    }
+  }
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -136,6 +150,10 @@ userinit(void)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
+  // first program priority set to 3
+  p->priority = 3;
+  // add it to the first queue
+  ptable.q_head[0] = p->q_node;
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -172,6 +190,22 @@ growproc(int n)
   return 0;
 }
 
+// put the q_node at the rear
+int
+put_qnode(queue_node *q_node, int priority) {
+  queue_node *cur_node = ptable.q_head[3-priority];
+  if (cur_node == 0) {
+    ptable.q_head[3-priority] = q_node;
+    return 0;
+  }
+  // cur_node != 0
+  while (cur_node->next != 0) {
+    cur_node = cur_node->next;
+  }
+  cur_node->next = q_node;
+  return 0;
+}
+
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
@@ -197,6 +231,10 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
+  // set priority
+  np->priority = curproc->priority;
+  // put it into the rear of queue
+  put_qnode(np->q_node, np->priority);
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -319,7 +357,7 @@ wait(void)
 void
 scheduler(void)
 {
-  struct proc *p;
+  struct proc *p, *tmp_p;
   struct cpu *c = mycpu();
   c->proc = 0;
   
@@ -329,24 +367,39 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+    while (1) {
+      for(int i=NLAYER-1;i>-1;i--) {
+        queue_node *node = ptable.q_head[i];
+        if (node) {
+          tmp_p = node->proc;
+          // check runnable before scheduler
+          if (tmp_p->state == RUNNABLE) {
+            p = tmp_p;
+            break;
+          }
+        }
+      }
     }
+    
+
+    // for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    //   if(p->state != RUNNABLE)
+    //     continue;
+
+    //   // Switch to chosen process.  It is the process's job
+    //   // to release ptable.lock and then reacquire it
+    //   // before jumping back to us.
+    //   c->proc = p;
+    //   switchuvm(p);
+    //   p->state = RUNNING;
+
+    //   swtch(&(c->scheduler), p->context);
+    //   switchkvm();
+
+    //   // Process is done running for now.
+    //   // It should have changed its p->state before coming back.
+    //   c->proc = 0;
+    // }
     release(&ptable.lock);
 
   }

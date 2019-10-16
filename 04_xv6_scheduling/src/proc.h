@@ -33,6 +33,13 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+// queue node for MLQ
+typedef struct __queue_node {
+  struct __queue_node *next;
+  struct proc *proc;
+  int inuse;
+} queue_node;
+
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)
@@ -48,6 +55,10 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  queue_node *q_node;
+  int priority; // priority of the process
+  int ticks[4]; // total num ticks each process has accumulated at each priority
+  int qtail[4]; // total num times moved to tail of this queue (e.g., setprio, end of timeslice, waking)
 };
 
 // Process memory is laid out contiguously, low addresses first:
