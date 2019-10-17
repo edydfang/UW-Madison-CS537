@@ -58,6 +58,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   queue_node *q_node;
+  char put_in;
   int priority; // priority of the process
   int ticks[4]; // total num ticks each process has accumulated at each priority
   int qtail[4]; // total num times moved to tail of this queue (e.g., setprio, end of timeslice, waking)

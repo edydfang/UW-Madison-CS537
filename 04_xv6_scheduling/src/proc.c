@@ -133,9 +133,18 @@ found:
   for (int i = 0; i<NLAYER; i++) {
     p->ticks[i] = 0;
     p->qtail[i] = 0;
+    // not put in any queue
+    p->put_in = -1;
   }
 
   return p;
+}
+
+void ptable_init(void) {
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    p->put_in = -1;
+  }
 }
 
 // Set up first user process.
@@ -144,7 +153,8 @@ userinit(void)
 {
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
-
+  // init ptable
+  ptable_init();
   p = allocproc();
   
   initproc = p;
@@ -324,6 +334,7 @@ wait(void)
         // recycle data structure
         p->q_node->inuse = 0;
         p->q_node = 0;
+        p->put_in = -1;
         release(&ptable.lock);
         return pid;
       }
@@ -337,6 +348,72 @@ wait(void)
 
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
+}
+
+void put_tail_q(queue_node *node, int priority) {
+  // double ensure no node after it
+  node->next = 0;
+  node->ticks = 0;
+  if (ptable.q_tail[priority] == 0)
+  {
+    ptable.q_head[priority] = node;
+    ptable.q_tail[priority] = node;
+  } else {
+    ptable.q_tail[priority]->next = node;
+    ptable.q_tail[priority] = node;
+  }
+  
+}
+
+void rm_from_q(queue_node *node, int priority) {
+  if (ptable.q_head[priority] == 0) {
+    // panic("delete node from empty queue");
+    return;
+  }
+  
+  if (ptable.q_head[priority] == node) {
+    ptable.q_head[priority] = ptable.q_head[priority]->next;
+    return;
+  }
+
+  queue_node *prev = ptable.q_head[priority];
+  while (prev->next != 0 && prev->next != node)
+  {
+    prev = prev->next;
+  }
+  if (prev->next == 0)
+  {
+    // panic("node to delete not in the queue");
+    return;
+  }
+  // do the remvoe 
+  prev->next = prev->next->next;
+}
+
+// update the queue accoding to the new status
+void refresh_q(void) {
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if (p->state != RUNNABLE && p->put_in != -1) {
+      // remove this process from the queue
+      rm_from_q(p->q_node, p->put_in);
+      p->put_in = -1;
+    } else if (p->state == RUNNABLE && p->put_in == -1) {
+      // new comming process / waked up process
+      put_tail_q(p->q_node, p->priority);
+      p->put_in = p->priority;
+    } else if (p->state == RUNNABLE && p->put_in != -1 &&  p->q_node->ticks == (5-p->put_in)*4) {
+      // reach the end of time slice
+      cprintf("end of slice\n");
+      // first remove from the previous queue (may not at the same queue)
+      rm_from_q(p->q_node, p->put_in);
+      // add to the new queue
+      put_tail_q(p->q_node, p->priority);
+      // update the putin
+      p->put_in = p->priority;
+    } 
+
   }
 }
 
@@ -360,6 +437,10 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+    // refresh the queue
+    refresh_q();
+    // loop over queue
+    // for(int pri=NLAYER-1; pri>-1; pri--){
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
