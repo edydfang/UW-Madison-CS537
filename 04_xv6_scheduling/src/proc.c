@@ -247,6 +247,7 @@ fork(void)
   pid = np->pid;
   // set priority the same as parent
   np->priority = curproc->priority;
+  np->q_node->proc = np;
 
   acquire(&ptable.lock);
 
@@ -355,6 +356,8 @@ void put_tail_q(queue_node *node, int priority) {
   // double ensure no node after it
   node->next = 0;
   node->ticks = 0;
+  // add q_tail value
+  node->proc->qtail[priority] += 1;
   if (ptable.q_tail[priority] == 0)
   {
     ptable.q_head[priority] = node;
@@ -373,6 +376,10 @@ void rm_from_q(queue_node *node, int priority) {
   }
   
   if (ptable.q_head[priority] == node) {
+    if (ptable.q_tail[priority] == ptable.q_head[priority]) {
+      ptable.q_tail[priority] = ptable.q_head[priority]->next;
+    }
+    
     ptable.q_head[priority] = ptable.q_head[priority]->next;
     return;
   }
@@ -397,6 +404,7 @@ void refresh_q(void) {
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
     if (p->state != RUNNABLE && p->put_in != -1) {
       // remove this process from the queue
+      // cprintf("remove node %x", p->q_node);
       rm_from_q(p->q_node, p->put_in);
       p->put_in = -1;
     } else if (p->state == RUNNABLE && p->put_in == -1) {
@@ -405,7 +413,7 @@ void refresh_q(void) {
       p->put_in = p->priority;
     } else if (p->state == RUNNABLE && p->put_in != -1 &&  p->q_node->ticks == (5-p->put_in)*4) {
       // reach the end of time slice
-      cprintf("end of slice\n");
+      // cprintf("end of slice\n");
       // first remove from the previous queue (may not at the same queue)
       rm_from_q(p->q_node, p->put_in);
       // add to the new queue
@@ -427,7 +435,7 @@ void refresh_q(void) {
 void
 scheduler(void)
 {
-  struct proc *p;
+  struct proc *p = 0;
   struct cpu *c = mycpu();
   c->proc = 0;
   
@@ -440,24 +448,30 @@ scheduler(void)
     // refresh the queue
     refresh_q();
     // loop over queue
-    // for(int pri=NLAYER-1; pri>-1; pri--){
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+    for(int pri=NLAYER-1; pri>-1; pri--){
+      if(ptable.q_head[pri] != 0){
+        p = ptable.q_head[pri]->proc;
+        p->ticks[pri] += 1;
+        p->q_node->ticks += 1;
+        break;
+      }
     }
+    if (p == 0)
+      continue;
+    
+    // Switch to chosen process.  It is the process's job
+    // to release ptable.lock and then reacquire it
+    // before jumping back to us.
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
     release(&ptable.lock);
 
   }
