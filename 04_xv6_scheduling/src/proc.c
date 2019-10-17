@@ -10,6 +10,9 @@
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+  queue_node q_node[NPROC];
+  queue_node *q_head[4];
+  queue_node *q_tail[4];
 } ptable;
 
 static struct proc *initproc;
@@ -111,6 +114,27 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  // allocate queue node for this process
+  queue_node *new_node;
+  // get unused node and allocate it
+  for (int i = 0; i < NPROC; i++) {
+    if (ptable.q_node[i].inuse == 0) {
+      new_node = &ptable.q_node[i];
+      // reset the queue node
+      new_node->inuse = 1;
+      new_node->proc = p;
+      new_node->next = 0;
+      new_node->prev = 0;
+      p->q_node = new_node;
+      break;
+    }
+  }
+  // reset stats
+  for (int i = 0; i<NLAYER; i++) {
+    p->ticks[i] = 0;
+    p->qtail[i] = 0;
+  }
+
   return p;
 }
 
@@ -136,6 +160,8 @@ userinit(void)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
+  // for MLQ
+  p->priority = 3;
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -209,6 +235,8 @@ fork(void)
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid;
+  // set priority the same as parent
+  np->priority = curproc->priority;
 
   acquire(&ptable.lock);
 
@@ -293,6 +321,9 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+        // recycle data structure
+        p->q_node->inuse = 0;
+        p->q_node = 0;
         release(&ptable.lock);
         return pid;
       }
@@ -332,7 +363,41 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
+      // Switch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire it
+      // before jumping back to us.
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
 
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
+    release(&ptable.lock);
+
+  }
+}
+
+void
+scheduler2(void)
+{
+  struct proc *p;
+  struct cpu *c = mycpu();
+  c->proc = 0;
+  
+  for(;;){
+    // Enable interrupts on this processor.
+    sti();
+
+    // Loop over process table looking for process to run.
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
