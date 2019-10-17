@@ -1,3 +1,6 @@
+
+#ifndef PROC_H
+#define PROC_H
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -36,9 +39,10 @@ enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 // queue node for MLQ
 typedef struct __queue_node {
   struct __queue_node *next;
+  struct __queue_node *prev;
   struct proc *proc;
-  int inuse;
-  uint time_slice;
+  char inuse; // node in use or not; inuse:1 not in use: 0
+  uint time_slice; // how many ticks in current time_slice
 } queue_node;
 
 // Per-process state
@@ -67,3 +71,4 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+#endif // PROC_H

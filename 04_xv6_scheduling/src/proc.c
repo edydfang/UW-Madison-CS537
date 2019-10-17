@@ -23,6 +23,7 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+// int put_qnode(struct __queue_node*, int);
 
 void
 pinit(void)
@@ -92,6 +93,12 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
 
+  // reset qtail and ticks
+  for (int i=0;i<NLAYER;i++) {
+    p->qtail[i] = 0;
+    p->ticks[i] = 0;
+  }
+
   queue_node *new_node;
   // get unused node and allocate it
   for (int i = 0; i < NPROC; i++) {
@@ -156,7 +163,7 @@ userinit(void)
   // first program priority set to 3
   p->priority = 3;
   // add it to the first queue
-  put_qnode(p->q_node, 3);
+  // put_qnode(p->q_node, 3);
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -196,19 +203,21 @@ growproc(int n)
 // put the q_node at the rear of queue with specific priority
 int
 put_qnode(queue_node *q_node, int priority) {
-  if(q_node == 0){
-    return -1;
-  }
-  queue_node *cur_node = ptable.q_head[3-priority];
-  q_node->time_slice = 0;
-  if (cur_node == 0) {
-    ptable.q_head[3-priority] = q_node;
-    ptable.q_tail[3-priority] = q_node;
-    return 0;
-  }
-  // cur_node != 0
-  ptable.q_tail[3-priority]->next = q_node;
-  cur_node->next = q_node;
+  // cprintf("Putting Node PID %d %s\n", q_node->proc->pid, q_node->proc->name);
+  // if(q_node == 0){
+  //   return -1;
+  // }
+  // queue_node *cur_node = ptable.q_head[priority];
+  // q_node->time_slice = 0;
+  // if (cur_node == 0) {
+  //   ptable.q_head[priority] = q_node;
+  //   ptable.q_tail[priority] = q_node;
+  // }else{
+  // // cur_node != 0
+  //   ptable.q_tail[priority]->next = q_node;
+  //   ptable.q_tail[priority] = q_node;
+  // }
+
   return 0;
 }
 
@@ -240,7 +249,8 @@ fork(void)
   // set priority
   np->priority = curproc->priority;
   // put it into the rear of queue
-  put_qnode(np->q_node, np->priority);
+  // cprintf("fork\n");
+  // put_qnode(np->q_node, np->priority);
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -337,7 +347,8 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
-        // change the inuse status
+        // release q_node and reset priority
+        p->priority = -1;
         p->q_node->inuse = 0;
         release(&ptable.lock);
         return pid;
@@ -355,6 +366,43 @@ wait(void)
   }
 }
 
+void
+scheduler(void)
+{
+  struct proc *p;
+  struct cpu *c = mycpu();
+  c->proc = 0;
+  
+  for(;;){
+    // Enable interrupts on this processor.
+    sti();
+
+    // Loop over process table looking for process to run.
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+
+      // Switch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire it
+      // before jumping back to us.
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
+    release(&ptable.lock);
+
+  }
+}
+
+/*
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -364,24 +412,27 @@ wait(void)
 //      via swtch back to the scheduler.
 void scheduler(void)
 {
-  struct proc *p = 0, *tmp_p = 0;
+  struct proc *p = 0;
   struct cpu *c = mycpu();
   c->proc = 0;
-  queue_node *node, *node_prev, *node_r;
+  queue_node *node, *node_prev, *node_r = 0;
   for (;;) {
     // Enable interrupts on this processor.
     sti();
-    // Loop over process table looking for process to run.
+    // Loop over queues looking for process to run.
     acquire(&ptable.lock);
-    for (int i = NLAYER - 1; i > -1; i--)
-    {
+    // cprintf("bug1\n");
+    for (int i = NLAYER - 1; i > -1; i--) {
+      // cprintf("bug2\n");
       node = ptable.q_head[i];
       // remove all not runnable node
       ptable.q_head[i] = 0;
       ptable.q_tail[i] = 0;
+      // cprintf("bug3\n");
       while (node!=0) {
         node_prev = node;
         node = node_prev->next;
+        // cprintf("bug4\n");
         if (node_prev->proc->state != RUNNABLE) {
           // reset
           node_prev->next = 0;
@@ -391,38 +442,49 @@ void scheduler(void)
           if(ptable.q_head[i] == 0) {
             // new head
             ptable.q_head[i] = node_prev;
+            node_r = node_prev;
           }else{
             // link them
             node_r->next = node_prev;
           }
           node_r = node_prev;
         }
+        // cprintf("bug5\n");
       }
-      if (node)
-      {
-        tmp_p = node->proc;
-        // check for ticks: time slice: ticks % 4*(5-i) == 0 and not only node in queue
-        if (tmp_p->ticks[i] % 4 * (5 - i) == 0 && node != ptable.q_tail[i])
-        {
-          // put it to the back and continue to next node
-          ptable.q_tail[i]->next = node;
-          ptable.q_tail[i] = node;
-          // switch to next node
-          node = node->next;
-          ptable.q_head[i] = node;
-          p = node->proc;
-          // shedule it
-          break;
-        }
-
-        // check runnable before schedule it
-        if (tmp_p->state != RUNNABLE)
-        {
-          p = tmp_p;
-          break;
-        }
+      // cprintf("bug6\n");
+      node = ptable.q_head[i];
+      // look up the node
+      if (node) {
+        // check for ticks: time slice: ticks == 4*(5-i) and not only node in queue
+        if (node->time_slice == 4*(5-i) && node != ptable.q_tail[i]) {
+            // put it to the back and continue to next node
+            node->proc->qtail[i] ++;
+            node->time_slice = 0;
+            ptable.q_tail[i]->next = node;
+            ptable.q_tail[i] = node;
+            // switch to next node
+            node = node->next;
+            ptable.q_head[i] = node;
+            p = node->proc;
+        } 
+        // cprintf("bug7\n");
+        // schedule it
+        p = node->proc;
+        // cprintf("bug8\n");
+        p->ticks[i] += 1;
+        // cprintf("bug9\n");
+        break;
       }
     }
+    if (p == 0)
+    {
+      continue;
+    }
+    
+    cprintf("Scheduling %s\n", p->name);
+    // increase time
+    node->time_slice += 1;
+    
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it
     // before jumping back to us.
@@ -435,9 +497,10 @@ void scheduler(void)
     // It should have changed its p->state before coming back.
     c->proc = 0;
     release(&ptable.lock);
+    
   }
 }
-
+*/
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state. Saves and restores
 // intena because intena is a property of this
@@ -545,7 +608,7 @@ wakeup1(void *chan)
     if(p->state == SLEEPING && p->chan == chan) {
       p->state = RUNNABLE;
       // put it in the right queue
-      put_qnode(p->q_node, p->priority);
+      cprintf("Wakeup\n");
     }
   }
 }
@@ -574,6 +637,7 @@ kill(int pid)
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING){
         p->state = RUNNABLE;
+        cprintf("kill\n");
         put_qnode(p->q_node, p->priority);
       }
       release(&ptable.lock);
