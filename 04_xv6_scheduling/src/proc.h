@@ -38,6 +38,7 @@ typedef struct __queue_node {
   struct __queue_node *next;
   struct proc *proc;
   int inuse;
+  uint time_slice;
 } queue_node;
 
 // Per-process state

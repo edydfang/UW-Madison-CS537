@@ -12,7 +12,8 @@ struct {
   struct spinlock lock;
   struct proc proc[NPROC];
   queue_node q_node[NPROC];
-  queue_node *q_head[4]; //0-pri3, 1-pri2, 2-pri1, 3-pri0
+  queue_node *q_head[4]; // 0-pri0; 1-pri1; 2-pri2; 3-pri3
+  queue_node *q_tail[4];
 } ptable;
 
 static struct proc *initproc;
@@ -97,8 +98,10 @@ found:
     if (ptable.q_node[i].inuse==0) {
       new_node = &ptable.q_node[i];
       new_node->inuse = 1;
+      new_node->next = 0;
+      new_node->proc = p;
+      new_node->time_slice = 0;
       p->q_node = new_node;
-      p->q_node->proc = p;
       break;
     }
   }
@@ -153,7 +156,7 @@ userinit(void)
   // first program priority set to 3
   p->priority = 3;
   // add it to the first queue
-  ptable.q_head[0] = p->q_node;
+  put_qnode(p->q_node, 3);
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -190,18 +193,21 @@ growproc(int n)
   return 0;
 }
 
-// put the q_node at the rear
+// put the q_node at the rear of queue with specific priority
 int
 put_qnode(queue_node *q_node, int priority) {
+  if(q_node == 0){
+    return -1;
+  }
   queue_node *cur_node = ptable.q_head[3-priority];
+  q_node->time_slice = 0;
   if (cur_node == 0) {
     ptable.q_head[3-priority] = q_node;
+    ptable.q_tail[3-priority] = q_node;
     return 0;
   }
   // cur_node != 0
-  while (cur_node->next != 0) {
-    cur_node = cur_node->next;
-  }
+  ptable.q_tail[3-priority]->next = q_node;
   cur_node->next = q_node;
   return 0;
 }
@@ -331,6 +337,8 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+        // change the inuse status
+        p->q_node->inuse = 0;
         release(&ptable.lock);
         return pid;
       }
@@ -354,54 +362,79 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
-void
-scheduler(void)
+void scheduler(void)
 {
-  struct proc *p, *tmp_p;
+  struct proc *p = 0, *tmp_p = 0;
   struct cpu *c = mycpu();
   c->proc = 0;
-  
-  for(;;){
+  queue_node *node, *node_prev, *node_r;
+  for (;;) {
     // Enable interrupts on this processor.
     sti();
-
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    while (1) {
-      for(int i=NLAYER-1;i>-1;i--) {
-        queue_node *node = ptable.q_head[i];
-        if (node) {
-          tmp_p = node->proc;
-          // check runnable before scheduler
-          if (tmp_p->state == RUNNABLE) {
-            p = tmp_p;
-            break;
+    for (int i = NLAYER - 1; i > -1; i--)
+    {
+      node = ptable.q_head[i];
+      // remove all not runnable node
+      ptable.q_head[i] = 0;
+      ptable.q_tail[i] = 0;
+      while (node!=0) {
+        node_prev = node;
+        node = node_prev->next;
+        if (node_prev->proc->state != RUNNABLE) {
+          // reset
+          node_prev->next = 0;
+        } else {
+          // new tail
+          ptable.q_tail[i] = node_prev;
+          if(ptable.q_head[i] == 0) {
+            // new head
+            ptable.q_head[i] = node_prev;
+          }else{
+            // link them
+            node_r->next = node_prev;
           }
+          node_r = node_prev;
+        }
+      }
+      if (node)
+      {
+        tmp_p = node->proc;
+        // check for ticks: time slice: ticks % 4*(5-i) == 0 and not only node in queue
+        if (tmp_p->ticks[i] % 4 * (5 - i) == 0 && node != ptable.q_tail[i])
+        {
+          // put it to the back and continue to next node
+          ptable.q_tail[i]->next = node;
+          ptable.q_tail[i] = node;
+          // switch to next node
+          node = node->next;
+          ptable.q_head[i] = node;
+          p = node->proc;
+          // shedule it
+          break;
+        }
+
+        // check runnable before schedule it
+        if (tmp_p->state != RUNNABLE)
+        {
+          p = tmp_p;
+          break;
         }
       }
     }
-    
-
-    // for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    //   if(p->state != RUNNABLE)
-    //     continue;
-
-    //   // Switch to chosen process.  It is the process's job
-    //   // to release ptable.lock and then reacquire it
-    //   // before jumping back to us.
-    //   c->proc = p;
-    //   switchuvm(p);
-    //   p->state = RUNNING;
-
-    //   swtch(&(c->scheduler), p->context);
-    //   switchkvm();
-
-    //   // Process is done running for now.
-    //   // It should have changed its p->state before coming back.
-    //   c->proc = 0;
-    // }
+    // Switch to chosen process.  It is the process's job
+    // to release ptable.lock and then reacquire it
+    // before jumping back to us.
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
     release(&ptable.lock);
-
   }
 }
 
@@ -508,9 +541,13 @@ wakeup1(void *chan)
 {
   struct proc *p;
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if(p->state == SLEEPING && p->chan == chan) {
       p->state = RUNNABLE;
+      // put it in the right queue
+      put_qnode(p->q_node, p->priority);
+    }
+  }
 }
 
 // Wake up all processes sleeping on chan.
@@ -535,8 +572,10 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING){
         p->state = RUNNABLE;
+        put_qnode(p->q_node, p->priority);
+      }
       release(&ptable.lock);
       return 0;
     }
