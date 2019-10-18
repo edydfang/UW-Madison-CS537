@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "./pstat.h"
 
 struct {
   struct spinlock lock;
@@ -22,6 +23,59 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+
+void proc_gather_pstat(struct pstat* result) {
+  // gather the states of all processes to the pstat
+  struct proc *p;
+  for(int i=0; i<NPROC; i++){
+    p = &ptable.proc[i];
+    if (p->state == SLEEPING || p->state == RUNNABLE || p->state == RUNNING){
+      result->inuse[i] = 1;
+    }else{
+      result->inuse[i] = 0;
+    }
+    result->pid[i] = p->pid;
+    result->priority[i] = p->priority;
+    result->state[i] = p->state;
+    for(int j=0; j<NLAYER; j++){
+      result->ticks[i][j] = p->ticks[j];
+      result->qtail[i][j] = p->qtail[j];
+    }
+  }
+}
+
+int proc_getpri(int pid) {
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if (p->pid == pid)
+    {
+      return p->priority;
+    }
+  }
+  return -1;
+}
+
+int proc_setpri(int pid, int pri) {
+  struct proc *p;
+  // validate pri
+  if(pri<0 || pri>3) {
+    return -1;
+  }
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if (p->pid == pid)
+    {
+      p->priority = pri;
+      // [CRITICAL] update the queue here
+      rm_from_q(p->q_node, p->put_in);
+      put_tail_q(p->q_node, p->priority);
+      p->put_in = p->priority;
+      return 0;
+    }
+  }
+  // invalid pid
+  return -1;
+}
+
 
 void
 pinit(void)
@@ -212,7 +266,7 @@ growproc(int n)
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
 int
-fork(void)
+fork2(int pri)
 {
   int i, pid;
   struct proc *np;
@@ -246,7 +300,8 @@ fork(void)
 
   pid = np->pid;
   // set priority the same as parent
-  np->priority = curproc->priority;
+  np->priority = pri;
+  // set the right proc mapping
   np->q_node->proc = np;
 
   acquire(&ptable.lock);
@@ -256,6 +311,11 @@ fork(void)
   release(&ptable.lock);
 
   return pid;
+}
+
+int fork(void) {
+  struct proc *curproc = myproc();
+  return fork2(curproc->priority);
 }
 
 // Exit the current process.  Does not return.
@@ -355,6 +415,7 @@ wait(void)
 void put_tail_q(queue_node *node, int priority) {
   // double ensure no node after it
   node->next = 0;
+  // new time slice
   node->ticks = 0;
   // add q_tail value
   node->proc->qtail[priority] += 1;
@@ -411,8 +472,9 @@ void refresh_q(void) {
       // new comming process / waked up process
       put_tail_q(p->q_node, p->priority);
       p->put_in = p->priority;
-    } else if (p->state == RUNNABLE && p->put_in != -1 &&  p->q_node->ticks == (5-p->put_in)*4) {
-      // reach the end of time slice
+    } else if (p->state == RUNNABLE && (p->put_in != p->priority || 
+                  (p->put_in != -1 &&  p->q_node->ticks == (5-p->put_in)*4))) {
+      // reach the end of time slice or priority change
       // cprintf("end of slice\n");
       // first remove from the previous queue (may not at the same queue)
       rm_from_q(p->q_node, p->put_in);
@@ -421,7 +483,6 @@ void refresh_q(void) {
       // update the putin
       p->put_in = p->priority;
     } 
-
   }
 }
 

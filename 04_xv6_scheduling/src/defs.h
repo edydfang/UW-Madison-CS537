@@ -9,6 +9,8 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+typedef struct __queue_node queue_node;
+struct pstat;
 
 // bio.c
 void            binit(void);
@@ -119,6 +121,12 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+int             proc_getpri(int);
+int             proc_setpri(int, int);
+int             fork2(int);
+void            rm_from_q(queue_node *, int);
+void            put_tail_q(queue_node *, int);
+void            proc_gather_pstat(struct pstat*); 
 
 // swtch.S
 void            swtch(struct context**, struct context*);

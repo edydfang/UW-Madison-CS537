@@ -29,3 +29,8 @@ SYSCALL(getpid)
 SYSCALL(sbrk)
 SYSCALL(sleep)
 SYSCALL(uptime)
+// new call
+SYSCALL(getpri)
+SYSCALL(setpri)
+SYSCALL(fork2)
+SYSCALL(getpinfo)
