@@ -1,3 +1,4 @@
+*.out
 _cat
 _*
 _echo
