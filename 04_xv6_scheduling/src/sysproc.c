@@ -114,8 +114,7 @@ int sys_fork2(void) {
   if (pri<0 || pri>3) {
     return -1;
   }
-  fork2(pri);
-  return 0;
+  return fork2(pri);
 }
 int sys_getpinfo(void){
   struct pstat *result;

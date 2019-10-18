@@ -178,7 +178,6 @@ found:
       new_node->inuse = 1;
       new_node->proc = p;
       new_node->next = 0;
-      new_node->prev = 0;
       p->q_node = new_node;
       break;
     }
@@ -299,15 +298,14 @@ fork2(int pri)
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid;
+
   // set priority the same as parent
   np->priority = pri;
   // set the right proc mapping
   np->q_node->proc = np;
 
   acquire(&ptable.lock);
-
   np->state = RUNNABLE;
-
   release(&ptable.lock);
 
   return pid;
