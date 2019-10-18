@@ -186,8 +186,15 @@ UPROGS=\
 	_loop\
 	_userRR\
 
+TESTPROGS=\
+	_test_8\
+	_test_15\
+
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
+
+fs-test.img: mkfs README $(UPROGS) $(TESTPROGS)
+	./mkfs fs.img README $(UPROGS) $(TESTPROGS)
 
 -include *.d
 
@@ -245,3 +252,5 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 	@echo "*** Now run 'gdb'." 1>&2
 	$(QEMU) -nographic $(QEMUOPTS) -S $(QEMUGDB)
 
+test:fs-test.img xv6.img
+	$(QEMU) -nographic $(QEMUOPTS)

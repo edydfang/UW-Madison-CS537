@@ -1,5 +1,8 @@
 #ifndef PROC_H
 #define PROC_H
+
+#include "pstat.h"
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -33,7 +36,6 @@ struct context {
   uint eip;
 };
 
-enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // queue node for MLQ
 typedef struct __queue_node {

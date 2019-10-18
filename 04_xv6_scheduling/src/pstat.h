@@ -2,7 +2,8 @@
 #define _PSTAT_H_
 
 #include "param.h"
-#include "./proc.h"
+
+enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 struct pstat {
   int inuse[NPROC]; // whether this slot of the process table is in use (1 or 0)

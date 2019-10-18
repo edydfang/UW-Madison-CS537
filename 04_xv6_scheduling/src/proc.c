@@ -393,7 +393,6 @@ wait(void)
         // recycle data structure
         p->q_node->inuse = 0;
         p->q_node = 0;
-        p->put_in = -1;
         release(&ptable.lock);
         return pid;
       }
@@ -436,7 +435,7 @@ void rm_from_q(queue_node *node, int priority) {
   
   if (ptable.q_head[priority] == node) {
     if (ptable.q_tail[priority] == ptable.q_head[priority]) {
-      ptable.q_tail[priority] = ptable.q_head[priority]->next;
+      ptable.q_tail[priority] = 0;
     }
     
     ptable.q_head[priority] = ptable.q_head[priority]->next;
@@ -448,8 +447,7 @@ void rm_from_q(queue_node *node, int priority) {
   {
     prev = prev->next;
   }
-  if (prev->next == 0)
-  {
+  if (prev->next == 0) {
     // panic("node to delete not in the queue");
     return;
   }
@@ -461,9 +459,11 @@ void rm_from_q(queue_node *node, int priority) {
 void refresh_q(void) {
   struct proc *p;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if (p->state == UNUSED) {
+      continue;
+    } 
     if (p->state != RUNNABLE && p->put_in != -1) {
       // remove this process from the queue
-      // cprintf("remove node %x", p->q_node);
       rm_from_q(p->q_node, p->put_in);
       p->put_in = -1;
     } else if (p->state == RUNNABLE && p->put_in == -1) {
@@ -501,11 +501,11 @@ scheduler(void)
   for(;;){
     // Enable interrupts on this processor.
     sti();
-
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     // refresh the queue
     refresh_q();
+    p = 0;
     // loop over queue
     for(int pri=NLAYER-1; pri>-1; pri--){
       if(ptable.q_head[pri] != 0){
@@ -515,22 +515,21 @@ scheduler(void)
         break;
       }
     }
-    if (p == 0)
-      continue;
-    
-    // Switch to chosen process.  It is the process's job
-    // to release ptable.lock and then reacquire it
-    // before jumping back to us.
-    c->proc = p;
-    switchuvm(p);
-    p->state = RUNNING;
+    if (p!=0){
+      // Switch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire it
+      // before jumping back to us.
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
 
-    swtch(&(c->scheduler), p->context);
-    switchkvm();
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
 
-    // Process is done running for now.
-    // It should have changed its p->state before coming back.
-    c->proc = 0;
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
     release(&ptable.lock);
 
   }
