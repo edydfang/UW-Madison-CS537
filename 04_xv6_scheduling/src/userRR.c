@@ -2,10 +2,12 @@
 
 #include "types.h"
 #include "stat.h"
+#include "./pstat.h"
 #include "user.h"
 
 #define MAXJOB_COUNT 1000
 int child_pid[MAXJOB_COUNT];
+struct pstat exit_stat;
 
 int
 main(int argc, char *argv[])
@@ -45,10 +47,22 @@ main(int argc, char *argv[])
           setpri(child_pid[j], 1);
       }
   }
+  getpinfo(&exit_stat);
   // printf(1,"Killing...\n");
   for(int i=0; i<job_count; i++){
       kill(child_pid[i]);
       wait();
+  }
+  // print all info
+  for (int i=0; i<64; i++){
+    for (int j=0; j<job_count; j++) {
+      if (exit_stat.pid[i] == child_pid[j] ) {
+        printf(1, "job %d\npriority %d\nticks 0-%d 1-%d 2-%d 3-%d\nqtail 0-%d 1-%d 2-%d 3-%d\n",
+			j, exit_stat.ticks[i][0], exit_stat.ticks[i][1], exit_stat.ticks[i][2],
+			exit_stat.ticks[i][3], exit_stat.qtail[i][0], exit_stat.qtail[i][1],
+			exit_stat.qtail[i][2], exit_stat.qtail[i][3]);
+      }
+    }
   }
   // exit
   exit();
