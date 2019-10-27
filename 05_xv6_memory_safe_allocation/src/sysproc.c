@@ -89,3 +89,25 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+extern int pg2pid[];
+
+int sys_dump_physmem(void)
+{
+  int* frames;
+  int* pids;
+  int num_framse;
+  if(argint(2, (void *)&num_framse)) {
+    return -1;
+  }
+  if(argptr(0, (void*)&frames, num_framse*sizeof(int)) < 0 || 
+    argptr(1, (void*)&pids, num_framse*sizeof(int)) < 0 ) {
+      return -1;
+  }
+  for(int i=0; i<num_framse; i++){
+    frames[i] = idx2framenum(1023-100+i);
+    pids[i] = pg2pid[1023-100+i];
+  }
+  
+  return 0;
+}

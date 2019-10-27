@@ -89,9 +89,8 @@ found:
   p->pid = nextpid++;
 
   release(&ptable.lock);
-
   // Allocate kernel stack.
-  if((p->kstack = kalloc()) == 0){
+  if((p->kstack = kalloc(p->pid)) == 0){
     p->state = UNUSED;
     return 0;
   }
@@ -188,7 +187,7 @@ fork(void)
   }
 
   // Copy process state from proc.
-  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
+  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz, np->pid)) == 0){
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;

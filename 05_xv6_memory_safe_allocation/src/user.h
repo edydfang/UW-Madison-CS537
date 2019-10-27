@@ -23,6 +23,9 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+// int dump_physmem(int *frames, int *pids, int numframes)
+int dump_physmem(int*, int*, int);
+
 
 // ulib.c
 int stat(const char*, struct stat*);
