@@ -116,7 +116,7 @@ kalloc(int pid)
 
   // we only care about page after kinit1 finished
   if ( ((uint) V2P(r)>>12) >=  ((uint)PHYSTOP>>12)-MAX_FRAME_NUM) {
-    pg2pid[VA2IDX(r)] = -2;
+    pg2pid[VA2IDX(r)] = pid;
     allocated_count ++;
     kmem.freelist = kmem.freelist->next;
     // cprintf("A: %d\tB: %x PID: %d %d\n", VA2IDX(r), V2P(r) >> 12, pid, allocated_count);

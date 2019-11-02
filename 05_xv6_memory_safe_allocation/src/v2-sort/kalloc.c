@@ -41,15 +41,6 @@ struct {
   struct run *freelist;
 } kmem;
 
-int idx2framenum(int idx) {
-  int frame_num = 0;
-  if (idx < 1024) {
-    frame_num = idx;
-  } else {
-    frame_num = (PHYSTOP >> 12) - (idx-1024) ;
-  }
-  return frame_num;
-}
 
 // Initialization happens in two phases.
 // 1. main() calls kinit1() while still using entrypgdir to place just
