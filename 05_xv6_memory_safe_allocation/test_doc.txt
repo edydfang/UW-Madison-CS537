@@ -1,0 +1,44 @@
+Consolidated post for all test cases:
+
+The test cases for Project 5 have been released, along with an automated testing framework. To use the testing framework:
+1. While testing your code during submission, go to your handin directory
+cd ~cs537-1/handin/login/p5, where login is your cs login name.
+And organize your code into a folder called src. Divide it into 3 folders called v1a, v1b and v2 and place your xv6 source code into these folders. Or name your folders accordingly if you are implementing sorting: v1a-sort, etc.
+
+For currently testing and implementing, organize your code in your remote login in a folder called src. And divide it into 3 folders: v1a, v1b and v2, as per the project specifications. Or name your folders accordingly if you are implementing sorting: v1a-sort, etc.
+NOTE: Failure of organizing into the right folders will not enable the tester to work. Also, submission of unorganized files, which are not as per the specifications mentioned above, will result in a penalty of 5 points. 
+
+2. Run the following command:
+FOR V1A: ~cs537-1/tests/p5/xv6-new-testframework_v1a/run-tests.sh
+FOR V1B: ~cs537-1/tests/p5/xv6-new-testframework_v1b/run-tests.sh
+
+SAME TEST CASES CAN BE USED FOR V1A-SORT AND V1B-SORT, BUT MAKE SURE YOU RENAME IT APPROPRIATELY WHILE HANDING IT IN
+
+FOR V2: ~cs537-1/tests/p5/xv6-new-testframework_v2/run-tests.sh
+FOR V2-SORT: cs537-1/tests/p5/xv6-new-testframework_v2-sort/run-tests.sh
+
+3. After running the command, you can see details of the test cases and the expected outputs in:
+FOR V1A: cd memory_xv6/tests
+FOR V1B: cd memory_xv6_v1b/tests
+FOR V2:  cd memory_xv6_v2/tests
+FOR V2-SORT: cd memory_xv6_v2_sort/tests
+
+Your output files are present in:
+V1A: cd memory_xv6/tests-out/ 
+V1B: cd memory_xv6_v1b/tests-out/ 
+
+V2: cd memory_xv6_v2/tests-out/ 
+V2-SORT: cd memory_xv6_v2_sort/tests-out/
+
+If any error occurs, you should compare the files in these two directories to figure out the problem that you are facing, using the below command:
+For instance, if test1 fails in v1a and v1b, then you need to compare 1.out present in both of these directories:
+FOR V1A: diff memory_xv6/tests/1.out memory_xv6/tests-out/1.out
+FOR V1B: diff memory_xv6_v1b/tests/1.out memory_xv6_v1b/tests-out/1.out
+
+FOR V2: diff memory_xv6_v2/tests/1.out memory_xv6_v2/tests-out/1.out
+
+FOR V2-SORT: diff memory_xv6_v2_sort/tests/1.out memory_xv6_v2_sort/tests-out/1.out 
+
+4. Also remember, the code in your handin directory should be used only for testing and submission. You should keep another copy elsewhere and work on your changes in that. You should not use the handin directory for making changes and testing locally.
+
+Please do try to improve your code even if you pass all public test cases. There will be hidden test cases and additional test cases that we will be adding and will be used in the final grading.

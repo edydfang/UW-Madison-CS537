@@ -90,24 +90,42 @@ sys_uptime(void)
   return xticks;
 }
 
-extern int pg2pid[];
 
 int sys_dump_physmem(void)
 {
   int* frames;
   int* pids;
-  int num_framse;
-  if(argint(2, (void *)&num_framse)) {
+  int num_frame;
+  if(argint(2, (void *)&num_frame)) {
     return -1;
   }
-  if(argptr(0, (void*)&frames, num_framse*sizeof(int)) < 0 || 
-    argptr(1, (void*)&pids, num_framse*sizeof(int)) < 0 ) {
+  if(argptr(0, (void*)&frames, num_frame*sizeof(int)) < 0 || 
+    argptr(1, (void*)&pids, num_frame*sizeof(int)) < 0 ) {
       return -1;
   }
-  for(int i=0; i<num_framse; i++){
-    frames[i] = idx2framenum(1023-100+i);
-    pids[i] = pg2pid[1023-100+i];
+  if(num_frame<1){
+    return -1;
   }
-  
+  int i = 0, j = 0;
+  // filled all data of used pages
+  while(i<num_frame && i<allocated_count) {
+    cprintf("b");
+    while(pg2pid[j]==-1){
+      j++;
+    }
+    cprintf("a");
+    frames[i] = IDX2FN(j);
+    pids[i] = pg2pid[j];
+    i ++;
+    j ++;
+  }
+  // unused array
+  if(i<num_frame){
+    for(;i<num_frame;i++){
+      cprintf("c");
+      frames[i] = -1;
+      pids[i] = -1;
+    }
+  } 
   return 0;
 }
