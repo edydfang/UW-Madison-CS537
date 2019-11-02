@@ -103,7 +103,7 @@ int sys_dump_physmem(void)
     argptr(1, (void*)&pids, num_frame*sizeof(int)) < 0 ) {
       return -1;
   }
-  if(num_frame<1){
+  if(num_frame < 1 || frames == 0 || pids == 0){
     return -1;
   }
   int i = 0, j = 0;

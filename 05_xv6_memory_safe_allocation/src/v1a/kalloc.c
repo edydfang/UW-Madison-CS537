@@ -95,26 +95,12 @@ kfree(char *v)
 
   // Fill with junk to catch dangling refs.
   memset(v, 1, PGSIZE);
-
-  r = (struct run*)v;
-  
   
   // we only care about page after kinit1 finished
-  if ( ((uint) V2P(v)>>12) >=  ((uint)PHYSTOP>>12)-MAX_FRAME_NUM) {
-    // cprintf("%x %x\n", VA2IDX(v), (PHYSTOP >> 12)-1);
+  if (!initflag && ((uint) V2P(v)>>12) >=  ((uint)PHYSTOP>>12)-MAX_FRAME_NUM) {
     pg2pid[VA2IDX(v)] = -1;
-    if (initflag) {
-      allocated_count --;
-      r_next = (struct run*)(v-PGSIZE);
-    if(kmem.use_lock)
-      acquire(&kmem.lock);
-    r_next->next = kmem.freelist;
-    kmem.freelist = r_next;
-    if(kmem.use_lock)
-      release(&kmem.lock);
-    }
   }
-
+  if(!initflag){   
   if(kmem.use_lock)
     acquire(&kmem.lock);
   r = (struct run*)v;
@@ -122,6 +108,7 @@ kfree(char *v)
   kmem.freelist = r;
   if(kmem.use_lock)
     release(&kmem.lock);
+  }
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -136,8 +123,6 @@ kalloc(int pid)
     acquire(&kmem.lock);
   r = kmem.freelist;
   kmem.freelist = r->next;
-  if(kmem.use_lock)
-    release(&kmem.lock);
 
   // we only care about page after kinit1 finished
   if ( ((uint) V2P(r)>>12) >=  ((uint)PHYSTOP>>12)-MAX_FRAME_NUM) {
@@ -146,6 +131,8 @@ kalloc(int pid)
     kmem.freelist = kmem.freelist->next;
     // cprintf("A: %d\tB: %x PID: %d %d\n", VA2IDX(r), V2P(r) >> 12, pid, allocated_count);
   }
+  if(kmem.use_lock)
+    release(&kmem.lock);
   return (char*)r;
 }
 
