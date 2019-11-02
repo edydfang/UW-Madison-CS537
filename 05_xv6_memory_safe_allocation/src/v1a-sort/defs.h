@@ -71,7 +71,7 @@ void            kinit1(void*, void*);
 void            kinit2(void*, void*);
 extern int pg2pid[MAX_FRAME_NUM];
 extern int allocated_count;
-#define IDX2FN(idx) ((PHYSTOP >> 12) - 1 + idx)
+#define IDX2FN(idx) (((uint)PHYSTOP >> 12) - 1 - idx)
 
 // kbd.c
 void            kbdintr(void);

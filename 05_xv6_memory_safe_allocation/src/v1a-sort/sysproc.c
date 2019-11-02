@@ -109,11 +109,9 @@ int sys_dump_physmem(void)
   int i = 0, j = 0;
   // filled all data of used pages
   while(i<num_frame && i<allocated_count) {
-    cprintf("b");
     while(pg2pid[j]==-1){
       j++;
     }
-    cprintf("a");
     frames[i] = IDX2FN(j);
     pids[i] = pg2pid[j];
     i ++;
@@ -122,7 +120,6 @@ int sys_dump_physmem(void)
   // unused array
   if(i<num_frame){
     for(;i<num_frame;i++){
-      cprintf("c");
       frames[i] = -1;
       pids[i] = -1;
     }

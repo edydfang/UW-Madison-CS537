@@ -13,7 +13,7 @@ main(void)
 {
   dump_physmem(frames, pids, NUM_FRAMES);
   for(int i=0;i<NUM_FRAMES;i++){
-      printf(1, "%d\t%d\n", frames[i], pids[i]);
+      printf(1, "%x\t%d\n", frames[i], pids[i]);
   }
   exit();
 }
