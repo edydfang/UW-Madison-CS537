@@ -39,3 +39,12 @@ More about data structure:
 - Although I don't know what the purpose of doing so (still no ordering guarantee), we ensure that partition `i` is sent to a reducer before partition `i+1`. 
 - As the signature of the Getter function only accepts a string as key arguments, we use data structure from [https://github.com/rxi/map](https://github.com/rxi/map) to get O(1) access of index of that key.
 - The good point of array-based implementation is that we can use `qsort` during the sorting phase. 
+
+
+## How to build or test
+```shell
+# build wordcount
+make
+make test-wordcount
+make gdb-wordcount
+```

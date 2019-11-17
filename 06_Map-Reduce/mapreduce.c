@@ -1,4 +1,6 @@
 
+// Copyright [2019] <Yidong Fang>
+
 /**
  * Copyright (c) 2014 rxi
  *
@@ -18,9 +20,6 @@
 
 #ifndef MAP_H
 #define MAP_H
-
-#include <string.h>
-
 #define MAP_VERSION "0.1.0"
 
 struct map_node_t;
@@ -251,13 +250,11 @@ const char *map_next_(map_base_t *m, map_iter_t *iter) {
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include "mapreduce.h"
+#include "./mapreduce.h"
 
 #define INIT_MAX_KV_PAIR_PARTITION 2
-typedef unsigned long ulong;
+typedef u_int64_t ulong;
 
 // data structure for intermediate values
 typedef struct __kv_pair {
@@ -312,7 +309,7 @@ ulong MR_DefaultHashPartition(char *key, int num_partitions) {
 ulong MR_SortedPartition(char *key, int num_partitions) {
   // key assumption: 32-bit unsigned integer
   // num_partitions assumption: power of 2
-  unsigned long key_num = strtoul(key, NULL, 0);
+  u_int64_t key_num = strtoul(key, NULL, 0);
   ulong assigned_partition = (key_num * num_partitions) >> 32;
   return assigned_partition;
 }
@@ -343,8 +340,10 @@ void MR_Emit(char *key, char *value) {
   char *key_copy = (char *)malloc(strlen(key) + 1);
   char *value_copy = (char *)malloc(strlen(value) + 1);
 
-  strcpy(key_copy, key);
-  strcpy(value_copy, value);
+  snprintf(key_copy, strlen(key), "%s", key);
+  snprintf(value_copy, strlen(value), "%s", value);
+  // strcpy(key_copy, key);
+  // strcpy(value_copy, value);
   new_pair->key = key_copy;
   new_pair->value = value_copy;
   partition->kv_pair_list[partition->next_to_fill++] = new_pair;

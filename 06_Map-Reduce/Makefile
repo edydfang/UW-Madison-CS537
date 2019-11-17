@@ -21,3 +21,7 @@ gdb-sort:sort.c mapreduce.c
 
 test-sort:sort
 	./sort  tests/1.txt tests/2.txt tests/3.txt 3 1 4
+
+valgrind:wordcount sort
+	valgrind --track-origins=yes --leak-check=full --show-leak-kinds=all ./wordcount test1.txt test2.txt 10 10 10
+	valgrind --track-origins=yes --leak-check=full --show-leak-kinds=all ./sort  tests/1.txt tests/2.txt tests/3.txt 3 1 4
