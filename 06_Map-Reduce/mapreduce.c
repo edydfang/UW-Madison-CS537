@@ -246,6 +246,7 @@ const char *map_next_(map_base_t *m, map_iter_t *iter) {
 }
 
 // =================== Defination of map above ================================
+// =================== Defination of Mapreduce below ==========================
 
 #include <pthread.h>
 #include <semaphore.h>
@@ -441,7 +442,10 @@ void sort_partition(int partition_idx) {
       key_tmp = key_cmp;
     }
   }
-  partition->end_idxs[cur_key_idx] = partition->next_to_fill;
+  if (cur_key_idx != -1) {
+    // if no data
+    partition->end_idxs[cur_key_idx] = partition->next_to_fill;
+  }
   partition->cur_key_idx = 0;
   //   printf("aaa %d\n", partition_idx);
   //   fflush(stdout);
@@ -492,12 +496,15 @@ void reduce_controller() {
       break;
     }
     key_to_reduce = partition_list[partition_to_reduce]->cur_key_idx++;
-    if (partition_list[partition_to_reduce]->cur_key_idx ==
+    if (partition_list[partition_to_reduce]->cur_key_idx >=
         partition_list[partition_to_reduce]->num_keys) {
       // this partition finished
       cur_reduce_partition++;
     }
     pthread_mutex_unlock(&cur_partition_lock);
+    if (key_to_reduce >= partition_list[partition_to_reduce]->num_keys) {
+      continue;
+    }
     // do reduce
     partition_data *partition = partition_list[partition_to_reduce];
     ulong kv_pair_idx = partition->start_idxs[key_to_reduce];

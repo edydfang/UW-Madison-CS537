@@ -1,5 +1,5 @@
 wordcount: wordcount.c mapreduce.c
-	gcc -o wordcount wordcount.c mapreduce.c -lpthread
+	gcc -g -o wordcount wordcount.c mapreduce.c -lpthread
 	chmod +x wordcount
 
 gdb:wordcount.c mapreduce.c
