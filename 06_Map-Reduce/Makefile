@@ -2,10 +2,22 @@ wordcount: wordcount.c mapreduce.c
 	gcc -g -o wordcount wordcount.c mapreduce.c -lpthread
 	chmod +x wordcount
 
-gdb:wordcount.c mapreduce.c
+sort:sort.c mapreduce.c
+	gcc -g -o sort sort.c mapreduce.c -lpthread
+	chmod +x sort
+
+gdb-wordcount:wordcount.c mapreduce.c
 	gcc -g -o wordcount wordcount.c mapreduce.c -lpthread
 	chmod +x wordcount
-	gdb --args ./wordcount test1.txt test2.txt
+	gdb --args ./wordcount test1.txt test2.txt 10 10 10
 
-test:wordcount
-	./wordcount test1.txt test2.txt
+test-wordcount:wordcount
+	./wordcount test1.txt test2.txt 10 10 10
+
+gdb-sort:sort.c mapreduce.c
+	gcc -g -o sort sort.c mapreduce.c -lpthread
+	chmod +x sort
+	gdb --args ./sort  tests/1.txt tests/2.txt tests/3.txt 3 1 4
+
+test-sort:sort
+	./sort  tests/1.txt tests/2.txt tests/3.txt 3 1 4

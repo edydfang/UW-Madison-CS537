@@ -276,6 +276,7 @@ typedef struct __partition_data {
   ulong *cur_idxs;
   ulong cur_key_idx;
   map_int_t m;
+  sem_t sent_flag;
   pthread_mutex_t lock;
 } partition_data;
 
@@ -311,7 +312,9 @@ ulong MR_DefaultHashPartition(char *key, int num_partitions) {
 ulong MR_SortedPartition(char *key, int num_partitions) {
   // key assumption: 32-bit unsigned integer
   // num_partitions assumption: power of 2
-  return 0;
+  unsigned long key_num = strtoul(key, NULL, 0);
+  ulong assigned_partition = (key_num * num_partitions) >> 32;
+  return assigned_partition;
 }
 
 void MR_Emit(char *key, char *value) {
@@ -360,6 +363,7 @@ void init_partition_list() {
     memset(partition_list[i]->kv_pair_list, 0,
            sizeof(kv_pair *) * INIT_MAX_KV_PAIR_PARTITION);
     partition_list[i]->next_to_fill = 0;
+    sem_init(&partition_list[i]->sent_flag, 0, 0);
   }
 }
 
@@ -447,8 +451,6 @@ void sort_partition(int partition_idx) {
     partition->end_idxs[cur_key_idx] = partition->next_to_fill;
   }
   partition->cur_key_idx = 0;
-  //   printf("aaa %d\n", partition_idx);
-  //   fflush(stdout);
   return;
 }
 void sort_controller() {
@@ -469,10 +471,7 @@ void sort_controller() {
 char *Get(char *key, int num_partition) {
   // func to get next value for specific key and partition
   partition_data *partition = partition_list[num_partition];
-  //   printf("getting %d %s\n", num_partition, key);
-  //   fflush(stdout);
   int key_idx = *map_get(&partition->m, key);
-  // printf("idx %d\n", key_idx);
   ulong cur_kv_pair_idx = partition->cur_idxs[key_idx];
   ulong end_idx = partition->end_idxs[key_idx];
   if (cur_kv_pair_idx >= end_idx) {
@@ -484,10 +483,15 @@ char *Get(char *key, int num_partition) {
 }
 
 void reduce_controller() {
-  // partition by partition; for each partition, one key per thread
+  /*detailed spec https://piazza.com/class/jyivrc1wvcv7dh?cid=1137
+  Partitions cannot be subdivided across reducers; each partition goes to
+  exactly one reducer. Partition i must be *sent* to a reducer before partition
+  i+1 is started. It doesn't have to be completed.
+  */
   int partition_to_reduce = -1;
-  int key_to_reduce = -1;
+
   while (1) {
+    // first assign a partition to a thread
     pthread_mutex_lock(&cur_partition_lock);
     partition_to_reduce = cur_reduce_partition;
     if (partition_to_reduce >= my_num_partitions) {
@@ -495,21 +499,28 @@ void reduce_controller() {
       pthread_mutex_unlock(&cur_partition_lock);
       break;
     }
-    key_to_reduce = partition_list[partition_to_reduce]->cur_key_idx++;
-    if (partition_list[partition_to_reduce]->cur_key_idx >=
-        partition_list[partition_to_reduce]->num_keys) {
-      // this partition finished
-      cur_reduce_partition++;
-    }
+    cur_reduce_partition++;
     pthread_mutex_unlock(&cur_partition_lock);
-    if (key_to_reduce >= partition_list[partition_to_reduce]->num_keys) {
-      continue;
-    }
+    // ensure partition sent in order here
+
     // do reduce
     partition_data *partition = partition_list[partition_to_reduce];
-    ulong kv_pair_idx = partition->start_idxs[key_to_reduce];
-    char *key = partition->kv_pair_list[kv_pair_idx]->key;
-    my_reduer(key, Get, partition_to_reduce);
+    if (partition_to_reduce > 0) {
+      sem_wait(&partition_list[partition_to_reduce - 1]->sent_flag);
+    }
+
+    for (size_t i = 0; i < partition->num_keys; i++) {
+      // reduce for each key
+      ulong kv_pair_idx = partition->start_idxs[i];
+      char *key = partition->kv_pair_list[kv_pair_idx]->key;
+      // printf("reduceing partition %d, key %s\n", partition_to_reduce, key);
+      my_reduer(key, Get, partition_to_reduce);
+      sem_post(&partition->sent_flag);
+    }
+    // if no key in the partition, we still need post semaphone
+    if (partition->num_keys == 0) {
+      sem_post(&partition->sent_flag);
+    }
   }
 }
 
@@ -585,6 +596,5 @@ void MR_Run(int argc, char *argv[], Mapper map, int num_mappers, Reducer reduce,
   free(my_mapper_threads);
   free(my_sort_threads);
   free(my_reducer_threads);
-
   return;
 }
