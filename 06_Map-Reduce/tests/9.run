@@ -1,0 +1,1 @@
+./sort tests/1.txt tests/2.txt 2 1 1

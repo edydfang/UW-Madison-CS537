@@ -1,0 +1,1 @@
+./wordcount tests/10.txt tests/11.txt 2 2 8 > tests-out/25.mid; python3 wordcount_parser.py --input-file tests-out/25.mid --check-num-reducers 2

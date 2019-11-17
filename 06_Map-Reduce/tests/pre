@@ -1,0 +1,2 @@
+gcc -o wordcount mapreduce.c wordcount.c -lpthread
+gcc -o sort mapreduce.c sort.c -lpthread

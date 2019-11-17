@@ -1,0 +1,1 @@
+./sort tests/1.txt tests/2.txt tests/3.txt tests/4.txt tests/5.txt 5 1 1

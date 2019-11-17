@@ -1,0 +1,1 @@
+./wordcount tests/1.txt tests/2.txt 2 1 1 > tests-out/11.mid; python3 wordcount_parser.py --input-file tests-out/11.mid

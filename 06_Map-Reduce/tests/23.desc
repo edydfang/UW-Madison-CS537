@@ -1,0 +1,1 @@
+Check Wordcount (multiple input files), num_mappers=M, num_reducers=R, num_partitions=R [R == num_mappers, M is small]

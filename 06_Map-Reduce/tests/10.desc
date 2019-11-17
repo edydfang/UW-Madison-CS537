@@ -1,0 +1,1 @@
+Check Sort (multiple input files), num_mappers=num_of_input_files, num_reducers=1, num_partitions=1
