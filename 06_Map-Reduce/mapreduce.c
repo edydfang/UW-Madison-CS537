@@ -287,7 +287,6 @@ Partitioner my_partitionar = NULL;
 Reducer my_reduer = NULL;
 Mapper my_mapper = NULL;
 int my_num_partitions = 0;
-int cur_sort_partition;
 int cur_reduce_partition;
 int input_count = 0;
 char **input_args = NULL;
@@ -372,7 +371,6 @@ void init_mapper_concurrency() {
 }
 
 void init_reducer_concurrency() {
-  cur_sort_partition = 0;
   cur_reduce_partition = 0;
   pthread_mutex_init(&cur_partition_lock, NULL);
 }
@@ -452,20 +450,6 @@ void sort_partition(int partition_idx) {
   partition->cur_key_idx = 0;
   return;
 }
-void sort_controller() {
-  // get partition for this thread
-  ulong partition_to_sort = -1;
-  while (1) {
-    pthread_mutex_lock(&cur_partition_lock);
-    partition_to_sort = cur_sort_partition++;
-    pthread_mutex_unlock(&cur_partition_lock);
-    if (partition_to_sort >= my_num_partitions) {
-      // all partitions are done
-      break;
-    }
-    sort_partition(partition_to_sort);
-  }
-}
 
 char *Get(char *key, int num_partition) {
   // func to get next value for specific key and partition
@@ -500,11 +484,12 @@ void reduce_controller() {
     }
     cur_reduce_partition++;
     pthread_mutex_unlock(&cur_partition_lock);
-    // ensure partition sent in order here
 
-    // do reduce
+    // do sort first 
     partition_data *partition = partition_list[partition_to_reduce];
+    sort_partition(partition_to_reduce);
     if (partition_to_reduce > 0) {
+      // ensure partition sent in order here
       sem_wait(&partition_list[partition_to_reduce - 1]->sent_flag);
     }
 
@@ -547,12 +532,14 @@ void destruct_partition_list() {
 void MR_Run(int argc, char *argv[], Mapper map, int num_mappers, Reducer reduce,
             int num_reducers, Partitioner partition, int num_partitions) {
   // set shared func or params
+  /*
   int num_sort_threads = 0;
   if (num_partitions < num_reducers || num_partitions < num_mappers) {
     num_sort_threads = num_partitions;
   } else {
     num_sort_threads = num_mappers > num_reducers ? num_mappers : num_reducers;
   }
+  */
   my_partitionar = partition;
   my_num_partitions = num_partitions;
   my_mapper = map;
@@ -565,7 +552,6 @@ void MR_Run(int argc, char *argv[], Mapper map, int num_mappers, Reducer reduce,
   // init threads
   my_mapper_threads = (pthread_t *)malloc(num_mappers * sizeof(pthread_t));
   my_reducer_threads = (pthread_t *)malloc(num_reducers * sizeof(pthread_t));
-  my_sort_threads = (pthread_t *)malloc(num_sort_threads * sizeof(pthread_t));
   init_mapper_concurrency();
   // run mappers
   for (int i = 0; i < num_mappers; i++) {
@@ -575,14 +561,7 @@ void MR_Run(int argc, char *argv[], Mapper map, int num_mappers, Reducer reduce,
     pthread_join(my_mapper_threads[i], NULL);
   }
 
-  // sort keys inside each partitions; multithreading for sorting
-  for (int i = 0; i < num_sort_threads; i++) {
-    pthread_create(&my_sort_threads[i], NULL, (void *)&sort_controller, NULL);
-  }
-  for (int i = 0; i < num_sort_threads; i++) {
-    pthread_join(my_sort_threads[i], NULL);
-  }
-  // run reducers
+  // run reducers; sort keys inside each partition in those threads
   for (int i = 0; i < num_reducers; i++) {
     pthread_create(&my_reducer_threads[i], NULL, (void *)&reduce_controller,
                    NULL);

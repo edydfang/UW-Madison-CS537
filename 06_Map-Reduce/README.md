@@ -48,3 +48,7 @@ make
 make test-wordcount
 make gdb-wordcount
 ```
+
+## TODO
+
+- use reduce threads to do sorting inside partition
