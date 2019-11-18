@@ -339,8 +339,8 @@ void MR_Emit(char *key, char *value) {
   char *key_copy = (char *)malloc(strlen(key) + 1);
   char *value_copy = (char *)malloc(strlen(value) + 1);
 
-  snprintf(key_copy, strlen(key), "%s", key);
-  snprintf(value_copy, strlen(value), "%s", value);
+  snprintf(key_copy, strlen(key) + 1, "%s", key);
+  snprintf(value_copy, strlen(value) + 1, "%s", value);
   // strcpy(key_copy, key);
   // strcpy(value_copy, value);
   new_pair->key = key_copy;
