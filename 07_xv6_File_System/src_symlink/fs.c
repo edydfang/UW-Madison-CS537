@@ -618,15 +618,11 @@ skipelem(char *path, char *name)
 // path element into name, which must have room for DIRSIZ bytes.
 // Must be called inside a transaction since it calls iput().
 static struct inode*
-namex(struct inode *root, char *path, int nameiparent, char *name, int depth)
+namex(struct inode *root, char *path, int nameiparent, char *name)
 {
   is_sym = 0;
   struct inode *ip, *next;
-  char buf[100], tname[DIRSIZ];
-  if(depth > 5) {
-    return 0;
-  }
-  // cprintf("%s %d\n", path, depth);
+  char buf[512], tname[DIRSIZ];
   if(*path == '/')
     ip = iget(ROOTDEV, ROOTINO);
   else if (root)
@@ -661,7 +657,7 @@ namex(struct inode *root, char *path, int nameiparent, char *name, int depth)
       buf[next->size] = 0;
       iunlockput(next);
       // extract inode recursively
-      next = namex(ip, buf, 0, tname, depth+1);
+      next = namex(ip, buf, 0, tname);
       is_sym = 1;
     }else{
       iunlock(next);
@@ -684,11 +680,11 @@ struct inode*
 namei(char *path)
 {
   char name[DIRSIZ];
-  return namex(0, path, 0, name, 0);
+  return namex(0, path, 0, name);
 }
 
 struct inode*
 nameiparent(char *path, char *name)
 {
-  return namex(0, path, 1, name, 0);
+  return namex(0, path, 1, name);
 }
