@@ -3,8 +3,7 @@ Programming Assignment 7 for CS 537
 
 ## Assumption
 
-- the target length of each symbolic link does not exceed 100
-- the depth of resolved path involving symbolic link does not exceed 5
+- the target length of each symbolic link does not exceed 512
 
 ## How to build
 
