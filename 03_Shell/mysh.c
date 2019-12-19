@@ -185,6 +185,8 @@ int func_general_cmd(char** argv, int argc, int bg_flag, int rd_flag) {
   if (child_pid == 0) {
     // child process
     if (rd_flag) {
+      // if exists, then remove the file
+      unlink(rd_filename);
       // output redirection
       int rd_fd = open(rd_filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
       dup2(rd_fd, 1);
@@ -241,7 +243,8 @@ int check_built_in(char** arg_arr, int argc) {
     if (!isnumber(arg_arr[1])) {
       fprintf(
           stderr,
-          "Error: built-in command wait only accept number as arguments!\n");
+          //"Error: built-in command wait only accept number as arguments!\n");
+          "Invalid JID -1\n");
       fflush(stderr);
     } else {
       func_wait(atoi(arg_arr[1]));
